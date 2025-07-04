@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -61,7 +62,20 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				// TiketX brand colors
+				tiketx: {
+					blue: '#3ABDFE',
+					violet: '#B64EDC', 
+					pink: '#FF7D52',
+					orange: '#FF7D52',
+					navy: '#0B1426',
+					'navy-light': '#1A2332'
 				}
+			},
+			backgroundImage: {
+				'tiketx-gradient': 'linear-gradient(135deg, #3ABDFE 0%, #B64EDC 50%, #FF7D52 100%)',
+				'tiketx-gradient-hover': 'linear-gradient(135deg, #2A9FE8 0%, #A542C6 50%, #E6673C 100%)'
 			},
 			borderRadius: {
 				lg: 'var(--radius)',
@@ -84,11 +98,22 @@ export default {
 					to: {
 						height: '0'
 					}
+				},
+				'fade-in': {
+					'0%': {
+						opacity: '0',
+						transform: 'translateY(10px)'
+					},
+					'100%': {
+						opacity: '1',
+						transform: 'translateY(0)'
+					}
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+				'fade-in': 'fade-in 0.3s ease-out'
 			}
 		}
 	},
