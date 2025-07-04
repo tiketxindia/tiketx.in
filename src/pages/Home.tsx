@@ -2,7 +2,6 @@ import { Search, User } from 'lucide-react';
 import { CategorySlider } from '@/components/CategorySlider';
 import { HeroBannerSlider } from '@/components/HeroBannerSlider';
 import { SectionRowCarousel } from '@/components/SectionRowCarousel';
-import { SidebarNavigation } from '@/components/SidebarNavigation';
 
 const Home = () => {
   const categories = ['Action', 'Romance', 'Comedy', 'Thriller', 'Sci-Fi', 'Drama'];
@@ -182,11 +181,8 @@ const Home = () => {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      {/* Sidebar Navigation */}
-      <SidebarNavigation />
-
-      {/* Main Content */}
-      <div className="lg:ml-72">
+      {/* Main Content - Responsive to sidebar */}
+      <div className="lg:ml-[var(--sidebar-width,288px)] transition-all duration-300">
         {/* Mobile Header */}
         <header className="lg:hidden flex items-center justify-between p-6 bg-black/50 backdrop-blur-lg border-b border-white/20">
           <div>

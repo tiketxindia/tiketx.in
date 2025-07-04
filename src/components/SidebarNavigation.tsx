@@ -1,7 +1,7 @@
 
 import { Home, Search, Grid3X3, Bookmark, Ticket, Settings, Menu, X } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export const SidebarNavigation = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -14,6 +14,11 @@ export const SidebarNavigation = () => {
     { icon: Ticket, label: 'My Tickets', path: '/my-tickets' },
     { icon: Settings, label: 'Settings', path: '/settings' }
   ];
+
+  // Add CSS custom property to communicate collapsed state to the document
+  useEffect(() => {
+    document.documentElement.style.setProperty('--sidebar-width', isCollapsed ? '80px' : '288px');
+  }, [isCollapsed]);
 
   return (
     <>
@@ -63,11 +68,6 @@ export const SidebarNavigation = () => {
           </div>
         </div>
       </nav>
-
-      {/* Mobile Menu Button */}
-      <button className="lg:hidden fixed top-6 left-6 z-50 glass-card p-3 rounded-xl bg-black/60 backdrop-blur-lg border border-white/30">
-        <Menu size={24} />
-      </button>
     </>
   );
 };
