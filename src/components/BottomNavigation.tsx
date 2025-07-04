@@ -1,5 +1,5 @@
 
-import { Home, Search, Film, Settings } from 'lucide-react';
+import { Home, Search, Film, User } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
 export const BottomNavigation = () => {
@@ -7,7 +7,7 @@ export const BottomNavigation = () => {
     { icon: Home, label: 'Home', path: '/' },
     { icon: Search, label: 'Search', path: '/search' },
     { icon: Film, label: 'My Movies', path: '/my-movies' },
-    { icon: Settings, label: 'Settings', path: '/settings' }
+    { icon: User, label: 'Profile', path: '/profile' }
   ];
 
   return (
