@@ -52,7 +52,7 @@ export const EnhancedFilmCard = ({
   return (
     <div 
       className={`min-w-[160px] md:min-w-[180px] transition-all duration-300 ease-out cursor-pointer relative ${
-        isHovered ? 'transform scale-105 z-20' : 'z-10'
+        isHovered ? 'transform scale-105 z-50' : 'z-10'
       }`}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
@@ -101,9 +101,15 @@ export const EnhancedFilmCard = ({
         </div>
       </div>
 
-      {/* Hover Details - Show below thumbnail */}
+      {/* Hover Details - Floating overlay positioned absolutely */}
       {isHovered && (
-        <div className="absolute top-full left-0 right-0 bg-black/95 backdrop-blur-lg border border-white/30 rounded-lg p-4 mt-2 shadow-2xl z-30 animate-fade-in">
+        <div className="fixed bg-black/95 backdrop-blur-lg border border-white/30 rounded-lg p-4 shadow-2xl z-[100] w-72 animate-fade-in pointer-events-none"
+             style={{
+               top: '50%',
+               left: '50%',
+               transform: 'translate(-50%, -50%)',
+               marginTop: '20px'
+             }}>
           {/* Movie metadata */}
           <div className="flex flex-wrap items-center text-xs text-gray-300 gap-2 mb-3">
             <span className="font-semibold">{year}</span>
@@ -128,7 +134,7 @@ export const EnhancedFilmCard = ({
           </p>
 
           {/* Action buttons */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between pointer-events-auto">
             <button 
               className="gradient-button flex items-center space-x-2 text-xs px-3 py-2 rounded-lg font-bold flex-1 mr-2"
               onClick={(e) => {
