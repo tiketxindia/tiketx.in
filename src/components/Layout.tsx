@@ -13,10 +13,9 @@ export const Layout = ({ children }: LayoutProps) => {
   const location = useLocation();
   const isDashboard = location.pathname.startsWith('/dashboard');
   const isAdmin = location.pathname.startsWith('/admin');
-  const isHome = location.pathname === '/';
 
   return (
-    <div className="min-h-screen bg-tiketx-navy text-white">
+    <div className="min-h-screen bg-black text-white">
       <div className="flex">
         <main className={`flex-1 ${isMobile ? 'pb-20' : ''}`}>
           {children}

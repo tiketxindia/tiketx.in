@@ -18,43 +18,45 @@ export const SidebarNavigation = () => {
   return (
     <>
       {/* Desktop Sidebar */}
-      <nav className={`hidden lg:flex fixed left-0 top-0 h-full glass-card m-4 rounded-2xl transition-all duration-300 z-40 ${
-        isCollapsed ? 'w-16' : 'w-64'
+      <nav className={`hidden lg:flex fixed left-0 top-0 h-full bg-black/60 backdrop-blur-lg border-r border-white/20 transition-all duration-300 z-40 ${
+        isCollapsed ? 'w-20' : 'w-72'
       }`}>
         <div className="flex flex-col w-full">
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-white/10">
+          <div className="flex items-center justify-between p-6 border-b border-white/20">
             {!isCollapsed && (
               <div className="flex items-center space-x-3">
-                <img src="/lovable-uploads/407505aa-5215-4c3d-ab75-8fd6ea8f6416.png" alt="TiketX" className="w-8 h-8" />
-                <h1 className="text-xl font-bold">TiketX</h1>
+                <img src="/lovable-uploads/407505aa-5215-4c3d-ab75-8fd6ea8f6416.png" alt="TiketX" className="w-10 h-10" />
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-tiketx-blue via-tiketx-violet to-tiketx-pink bg-clip-text text-transparent">
+                  TiketX
+                </h1>
               </div>
             )}
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
               className="p-2 hover:bg-white/10 rounded-lg transition-colors"
             >
-              {isCollapsed ? <Menu size={20} /> : <X size={20} />}
+              {isCollapsed ? <Menu size={24} /> : <X size={24} />}
             </button>
           </div>
           
           {/* Navigation Items */}
-          <div className="flex-1 py-6">
-            <div className="space-y-2 px-3">
+          <div className="flex-1 py-8">
+            <div className="space-y-3 px-4">
               {navItems.map(({ icon: Icon, label, path }) => (
                 <NavLink
                   key={path}
                   to={path}
                   className={({ isActive }) =>
-                    `flex items-center space-x-3 px-3 py-3 rounded-xl transition-all duration-200 group ${
+                    `flex items-center space-x-4 px-4 py-4 rounded-xl transition-all duration-200 group ${
                       isActive
-                        ? 'bg-tiketx-gradient text-white'
+                        ? 'bg-gradient-to-r from-tiketx-blue/20 via-tiketx-violet/20 to-tiketx-pink/20 text-white border border-white/20'
                         : 'text-gray-400 hover:text-white hover:bg-white/10'
                     }`
                   }
                 >
-                  <Icon size={20} />
-                  {!isCollapsed && <span className="font-medium">{label}</span>}
+                  <Icon size={24} />
+                  {!isCollapsed && <span className="font-medium text-lg">{label}</span>}
                 </NavLink>
               ))}
             </div>
@@ -63,8 +65,8 @@ export const SidebarNavigation = () => {
       </nav>
 
       {/* Mobile Menu Button */}
-      <button className="lg:hidden fixed top-4 left-4 z-50 glass-card p-3 rounded-xl">
-        <Menu size={20} />
+      <button className="lg:hidden fixed top-6 left-6 z-50 glass-card p-3 rounded-xl bg-black/60 backdrop-blur-lg border border-white/30">
+        <Menu size={24} />
       </button>
     </>
   );

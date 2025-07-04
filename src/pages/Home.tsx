@@ -1,4 +1,3 @@
-
 import { Search, User } from 'lucide-react';
 import { CategorySlider } from '@/components/CategorySlider';
 import { HeroBannerSlider } from '@/components/HeroBannerSlider';
@@ -21,22 +20,26 @@ const Home = () => {
       backgroundImage: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=1200&h=600&fit=crop',
       posterImage: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=300&h=450&fit=crop',
       filmId: 1,
-      hasTicket: false
+      hasTicket: false,
+      rating: 4.8,
+      imdbRating: 6.3
     },
     {
       id: 2,
-      title: 'MIDNIGHT MYSTERY',
+      title: 'EVERY BODY',
       year: '2023',
       language: 'English',
       duration: '1h 28m',
       certificate: 'U/A 18+',
       description: 'From silenced childhoods marked by harmful surgeries, three intersex adults share their stories of resilience and triumph.',
-      genres: ['Documentary', 'Biography', 'True Crime'],
+      genres: ['Documentary', 'Biography', 'True Crime', 'LGBTQ+'],
       backgroundImage: 'https://images.unsplash.com/photo-1500673922987-e212871fec22?w=1200&h=600&fit=crop',
       posterImage: 'https://images.unsplash.com/photo-1500673922987-e212871fec22?w=300&h=450&fit=crop',
       filmId: 2,
       hasTicket: true,
-      ticketExpiry: '05 Jul, 11:30 PM'
+      ticketExpiry: '05 Jul, 11:30 PM',
+      rating: 4.3,
+      imdbRating: 7.2
     },
     {
       id: 3,
@@ -50,7 +53,9 @@ const Home = () => {
       backgroundImage: 'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?w=1200&h=600&fit=crop',
       posterImage: 'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?w=300&h=450&fit=crop',
       filmId: 3,
-      hasTicket: false
+      hasTicket: false,
+      rating: 4.5,
+      imdbRating: 6.8
     }
   ];
 
@@ -176,16 +181,18 @@ const Home = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-tiketx-navy text-white">
+    <div className="min-h-screen bg-black text-white">
       {/* Sidebar Navigation */}
       <SidebarNavigation />
 
       {/* Main Content */}
-      <div className="lg:ml-80">
+      <div className="lg:ml-72">
         {/* Mobile Header */}
-        <header className="lg:hidden flex items-center justify-between p-6">
+        <header className="lg:hidden flex items-center justify-between p-6 bg-black/50 backdrop-blur-lg border-b border-white/20">
           <div>
-            <h1 className="text-2xl font-bold mb-1">Welcome, Angeline 👋</h1>
+            <h1 className="text-2xl font-bold mb-1 bg-gradient-to-r from-tiketx-blue via-tiketx-violet to-tiketx-pink bg-clip-text text-transparent">
+              Welcome, Angeline 👋
+            </h1>
             <p className="text-gray-400">Let's relax and watch a movie!</p>
           </div>
           <div className="w-12 h-12 bg-tiketx-gradient rounded-full flex items-center justify-center">
@@ -194,19 +201,21 @@ const Home = () => {
         </header>
 
         {/* Desktop Search & User - Top Bar */}
-        <div className="hidden lg:flex items-center justify-between p-6 border-b border-white/10">
+        <div className="hidden lg:flex items-center justify-between p-6 bg-black/30 backdrop-blur-lg border-b border-white/20">
           <div className="flex-1 max-w-md">
             <div className="relative">
               <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
               <input
                 type="text"
                 placeholder="Search movies, series, shows..."
-                className="w-full glass-card pl-12 pr-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-tiketx-blue"
+                className="w-full bg-black/40 border border-white/30 rounded-xl pl-12 pr-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-tiketx-blue focus:border-transparent backdrop-blur-lg"
               />
             </div>
           </div>
           <div className="flex items-center space-x-4">
-            <span className="text-lg font-semibold">Welcome, Angeline 👋</span>
+            <span className="text-lg font-semibold bg-gradient-to-r from-tiketx-blue via-tiketx-violet to-tiketx-pink bg-clip-text text-transparent">
+              Welcome, Angeline 👋
+            </span>
             <div className="w-10 h-10 bg-tiketx-gradient rounded-full flex items-center justify-center">
               <User size={20} className="text-white" />
             </div>
@@ -220,7 +229,7 @@ const Home = () => {
             <input
               type="text"
               placeholder="Search movies, series, shows..."
-              className="w-full glass-card pl-12 pr-4 py-4 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-tiketx-blue"
+              className="w-full bg-black/40 border border-white/30 rounded-xl pl-12 pr-4 py-4 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-tiketx-blue focus:border-transparent backdrop-blur-lg"
             />
           </div>
         </div>
