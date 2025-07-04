@@ -1,3 +1,4 @@
+
 import { Search, User } from 'lucide-react';
 import { CategorySlider } from '@/components/CategorySlider';
 import { HeroBannerSlider } from '@/components/HeroBannerSlider';
@@ -71,7 +72,8 @@ const Home = () => {
       language: 'English',
       description: 'The God of Thunder returns in an epic adventure that will test his limits like never before.',
       type: 'movie' as const,
-      hasTicket: false
+      hasTicket: false,
+      votes: 2847
     },
     {
       id: 2,
@@ -85,7 +87,8 @@ const Home = () => {
       language: 'English',
       description: 'A gripping thriller that will keep you on the edge of your seat.',
       hasTicket: true,
-      ticketExpiry: '15 Jul, 10:00 PM'
+      ticketExpiry: '15 Jul, 10:00 PM',
+      votes: 1456
     },
     {
       id: 3,
@@ -98,7 +101,8 @@ const Home = () => {
       certificate: 'U',
       language: 'Hindi',
       description: 'An underwater adventure filled with wonder and mystery.',
-      hasTicket: false
+      hasTicket: false,
+      votes: 987
     },
     {
       id: 4,
@@ -112,7 +116,8 @@ const Home = () => {
       language: 'Tamil',
       description: 'A compelling urban drama that explores modern relationships.',
       type: 'series' as const,
-      hasTicket: false
+      hasTicket: false,
+      votes: 3421
     }
   ];
 
@@ -129,7 +134,8 @@ const Home = () => {
       language: 'English',
       description: 'An epic fantasy adventure that will take you to new worlds.',
       type: 'series' as const,
-      hasTicket: false
+      hasTicket: false,
+      votes: 5632
     },
     {
       id: 6,
@@ -144,7 +150,8 @@ const Home = () => {
       description: 'A cyberpunk thriller set in a neon-lit future.',
       type: 'movie' as const,
       hasTicket: true,
-      ticketExpiry: '20 Jul, 9:45 PM'
+      ticketExpiry: '20 Jul, 9:45 PM',
+      votes: 2198
     }
   ];
 
@@ -161,7 +168,8 @@ const Home = () => {
       language: 'Hindi',
       description: 'A heartwarming short film about everyday connections.',
       type: 'short' as const,
-      hasTicket: false
+      hasTicket: false,
+      votes: 456
     },
     {
       id: 8,
@@ -175,7 +183,8 @@ const Home = () => {
       language: 'English',
       description: 'A beautiful story about love and letting go.',
       type: 'short' as const,
-      hasTicket: false
+      hasTicket: false,
+      votes: 789
     }
   ];
 

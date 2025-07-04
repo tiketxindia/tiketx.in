@@ -18,6 +18,7 @@ interface EnhancedFilmCardProps {
   ticketExpiry?: string;
   type?: 'movie' | 'series' | 'short';
   isInWatchlist?: boolean;
+  votes?: number;
 }
 
 export const EnhancedFilmCard = ({ 
@@ -34,7 +35,8 @@ export const EnhancedFilmCard = ({
   hasTicket = false,
   ticketExpiry,
   type = 'movie',
-  isInWatchlist = false
+  isInWatchlist = false,
+  votes = 147
 }: EnhancedFilmCardProps) => {
   const navigate = useNavigate();
   const [isHovered, setIsHovered] = useState(false);
@@ -49,27 +51,27 @@ export const EnhancedFilmCard = ({
 
   return (
     <div 
-      className={`min-w-[160px] md:min-w-[180px] animate-fade-in group relative transition-all duration-300 ${
-        isHovered ? 'transform -translate-y-2 z-20' : 'z-10'
+      className={`min-w-[160px] md:min-w-[180px] transition-all duration-300 ease-out cursor-pointer relative ${
+        isHovered ? 'transform scale-105 z-20' : 'z-10'
       }`}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onClick={() => navigate(`/movie/${id}`)}
+      style={{
+        boxShadow: isHovered ? '0 20px 40px rgba(0, 0, 0, 0.6)' : '0 4px 8px rgba(0, 0, 0, 0.3)',
+      }}
     >
       {/* Poster Container */}
-      <div className="relative mb-3 cursor-pointer">
+      <div className="relative mb-3">
         <img
           src={poster}
           alt={title}
-          className={`w-full h-[240px] md:h-[270px] object-cover rounded-lg transition-all duration-300 ${
-            isHovered ? 'shadow-2xl shadow-black/50' : 'shadow-lg'
-          }`}
+          className="w-full h-[240px] md:h-[270px] object-cover rounded-lg"
         />
         
-        {/* Rating Badge - Always visible */}
-        <div className="absolute top-2 right-2 bg-black/80 px-2 py-1 rounded-md text-xs flex items-center backdrop-blur-sm border border-white/20">
-          <Star size={12} className="text-yellow-400 mr-1" />
-          <span className="font-semibold">{rating}</span>
+        {/* Certificate Badge - Always visible */}
+        <div className="absolute top-2 right-2 bg-black/80 px-2 py-1 rounded-md text-xs font-medium backdrop-blur-sm border border-white/20">
+          {certificate}
         </div>
 
         {/* Type Badge */}
@@ -87,16 +89,15 @@ export const EnhancedFilmCard = ({
         )}
       </div>
       
-      {/* Card Content - Always visible */}
+      {/* Default Card Content - Always visible */}
       <div className="space-y-2">
-        <h3 className="font-bold text-sm line-clamp-2 group-hover:text-tiketx-blue transition-colors leading-tight">
+        <h3 className="font-bold text-sm line-clamp-2 leading-tight text-white">
           {title}
         </h3>
-        <div className="flex items-center justify-between text-xs text-gray-400">
-          <span className="bg-white/10 text-white px-2 py-1 rounded-md font-medium border border-white/20">
-            {genre}
-          </span>
-          <span className="font-medium">{duration}</span>
+        
+        {/* Default info - votes instead of genre/duration */}
+        <div className="text-xs text-gray-400">
+          <span className="font-medium">{votes} votes</span>
         </div>
       </div>
 
@@ -107,9 +108,18 @@ export const EnhancedFilmCard = ({
           <div className="flex flex-wrap items-center text-xs text-gray-300 gap-2 mb-3">
             <span className="font-semibold">{year}</span>
             <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
-            <span className="bg-white/20 px-2 py-1 rounded text-xs font-medium">{certificate}</span>
+            <span className="bg-white/20 px-2 py-1 rounded text-xs font-medium">{genre}</span>
             <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
             <span>{language}</span>
+            <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
+            <span>{duration}</span>
+          </div>
+
+          {/* Rating */}
+          <div className="flex items-center text-xs text-gray-300 mb-3">
+            <Star size={12} className="text-yellow-400 mr-1" />
+            <span className="font-semibold mr-2">{rating}</span>
+            <span className="text-gray-400">({votes} votes)</span>
           </div>
           
           {/* Description */}

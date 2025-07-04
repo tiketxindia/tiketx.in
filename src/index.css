@@ -75,12 +75,13 @@ All colors MUST be HSL.
   }
   
   .movie-card {
-    @apply glass-card p-3 hover:bg-black/60 transition-all duration-300 cursor-pointer;
+    @apply glass-card p-3 transition-all duration-300 cursor-pointer;
   }
 
-  /* Updated movie card hover effects for smaller cards */
+  /* Enhanced movie card hover effects with proper scaling */
   .movie-card:hover {
-    @apply transform -translate-y-2 shadow-2xl shadow-black/50;
+    @apply transform scale-105 shadow-2xl;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
     z-index: 20;
   }
 
@@ -88,6 +89,7 @@ All colors MUST be HSL.
   .movie-card {
     position: relative;
     z-index: 10;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
   }
 
   .hero-card {
@@ -110,5 +112,20 @@ All colors MUST be HSL.
   /* Ensure hover details appear above other content */
   .enhanced-film-card-hover {
     z-index: 100;
+  }
+
+  /* Smooth transitions for all interactive elements */
+  .transition-hover {
+    transition: transform 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease;
+  }
+
+  /* Enhanced card scaling with proper spacing */
+  .card-scale-hover {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .card-scale-hover:hover {
+    transform: scale(1.05);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
   }
 }
