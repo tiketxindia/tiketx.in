@@ -1,36 +1,60 @@
+
 import { Search, User } from 'lucide-react';
 import { CategorySlider } from '@/components/CategorySlider';
-import { BannerSlider } from '@/components/BannerSlider';
-import { SectionRow } from '@/components/SectionRow';
+import { HeroBannerSlider } from '@/components/HeroBannerSlider';
+import { SectionRowCarousel } from '@/components/SectionRowCarousel';
+import { SidebarNavigation } from '@/components/SidebarNavigation';
 
 const Home = () => {
   const categories = ['Action', 'Romance', 'Comedy', 'Thriller', 'Sci-Fi', 'Drama'];
   
-  const banners = [
+  const heroBanners = [
     {
       id: 1,
-      title: 'Thor: Love and Thunder',
-      subtitle: 'The God of Thunder returns in an epic adventure that will test his limits like never before.',
-      image: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=1200&h=600&fit=crop',
-      filmId: 1
+      title: 'THOR: LOVE AND THUNDER',
+      year: '2024',
+      language: 'English',
+      duration: '1h 53m',
+      certificate: 'U/A 16+',
+      description: 'The God of Thunder returns in an epic adventure that will test his limits like never before. An intergalactic journey filled with action, humor, and heart.',
+      genres: ['Action', 'Adventure', 'Fantasy'],
+      backgroundImage: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=1200&h=600&fit=crop',
+      posterImage: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=300&h=450&fit=crop',
+      filmId: 1,
+      hasTicket: false
     },
     {
       id: 2,
-      title: 'Midnight Mystery',
-      subtitle: 'A gripping thriller that will keep you on the edge of your seat until the very last moment.',
-      image: 'https://images.unsplash.com/photo-1500673922987-e212871fec22?w=1200&h=600&fit=crop',
-      filmId: 2
+      title: 'MIDNIGHT MYSTERY',
+      year: '2023',
+      language: 'English',
+      duration: '1h 28m',
+      certificate: 'U/A 18+',
+      description: 'From silenced childhoods marked by harmful surgeries, three intersex adults share their stories of resilience and triumph.',
+      genres: ['Documentary', 'Biography', 'True Crime'],
+      backgroundImage: 'https://images.unsplash.com/photo-1500673922987-e212871fec22?w=1200&h=600&fit=crop',
+      posterImage: 'https://images.unsplash.com/photo-1500673922987-e212871fec22?w=300&h=450&fit=crop',
+      filmId: 2,
+      hasTicket: true,
+      ticketExpiry: '05 Jul, 11:30 PM'
     },
     {
       id: 3,
-      title: 'Ocean Dreams',
-      subtitle: 'Dive into an underwater adventure filled with wonder, mystery, and breathtaking visuals.',
-      image: 'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?w=1200&h=600&fit=crop',
-      filmId: 3
+      title: 'OCEAN DREAMS',
+      year: '2024',
+      language: 'Hindi',
+      duration: '2h 22m',
+      certificate: 'U',
+      description: 'Dive into an underwater adventure filled with wonder, mystery, and breathtaking visuals that will transport you to another world.',
+      genres: ['Adventure', 'Family', 'Fantasy'],
+      backgroundImage: 'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?w=1200&h=600&fit=crop',
+      posterImage: 'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?w=300&h=450&fit=crop',
+      filmId: 3,
+      hasTicket: false
     }
   ];
 
-  const trendingNow = [
+  const latestReleases = [
     {
       id: 1,
       title: 'Thor: Love and Thunder',
@@ -38,7 +62,12 @@ const Home = () => {
       genre: 'Action',
       rating: 4.8,
       duration: '118 min',
-      type: 'movie' as const
+      year: '2024',
+      certificate: 'U/A 16+',
+      language: 'English',
+      description: 'The God of Thunder returns in an epic adventure that will test his limits like never before.',
+      type: 'movie' as const,
+      hasTicket: false
     },
     {
       id: 2,
@@ -46,7 +75,13 @@ const Home = () => {
       poster: 'https://images.unsplash.com/photo-1500673922987-e212871fec22?w=300&h=450&fit=crop',
       genre: 'Mystery',
       rating: 4.2,
-      duration: '97 min'
+      duration: '97 min',
+      year: '2023',
+      certificate: 'U/A 16+',
+      language: 'English',
+      description: 'A gripping thriller that will keep you on the edge of your seat.',
+      hasTicket: true,
+      ticketExpiry: '15 Jul, 10:00 PM'
     },
     {
       id: 3,
@@ -54,89 +89,155 @@ const Home = () => {
       poster: 'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?w=300&h=450&fit=crop',
       genre: 'Adventure',
       rating: 4.5,
-      duration: '142 min'
+      duration: '142 min',
+      year: '2024',
+      certificate: 'U',
+      language: 'Hindi',
+      description: 'An underwater adventure filled with wonder and mystery.',
+      hasTicket: false
+    },
+    {
+      id: 4,
+      title: 'Urban Chronicles',
+      poster: 'https://images.unsplash.com/photo-1470813740244-df37b8c1edcb?w=300&h=450&fit=crop',
+      genre: 'Drama',
+      rating: 4.6,
+      duration: '128 min',
+      year: '2024',
+      certificate: 'U/A 16+',
+      language: 'Tamil',
+      description: 'A compelling urban drama that explores modern relationships.',
+      type: 'series' as const,
+      hasTicket: false
     }
   ];
 
-  const directorsPicks = [
+  const actionPicks = [
     {
-      id: 4,
+      id: 5,
       title: 'Starlight Dreams',
       poster: 'https://images.unsplash.com/photo-1470813740244-df37b8c1edcb?w=300&h=450&fit=crop',
       genre: 'Fantasy',
       rating: 4.9,
       duration: '156 min',
-      type: 'series' as const
+      year: '2024',
+      certificate: 'U/A 13+',
+      language: 'English',
+      description: 'An epic fantasy adventure that will take you to new worlds.',
+      type: 'series' as const,
+      hasTicket: false
     },
     {
-      id: 5,
+      id: 6,
       title: 'Neon Nights',
       poster: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=300&h=450&fit=crop',
       genre: 'Thriller',
       rating: 4.6,
       duration: '134 min',
-      type: 'movie' as const
+      year: '2023',
+      certificate: 'A',
+      language: 'English',
+      description: 'A cyberpunk thriller set in a neon-lit future.',
+      type: 'movie' as const,
+      hasTicket: true,
+      ticketExpiry: '20 Jul, 9:45 PM'
     }
   ];
 
-  const regionalFavourites = [
-    {
-      id: 6,
-      title: 'Tamil Classic',
-      poster: 'https://images.unsplash.com/photo-1500673922987-e212871fec22?w=300&h=450&fit=crop',
-      genre: 'Drama',
-      rating: 4.7,
-      duration: '142 min',
-      type: 'movie' as const
-    },
+  const shortFilms = [
     {
       id: 7,
-      title: 'Malayalam Masterpiece',
-      poster: 'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?w=300&h=450&fit=crop',
+      title: 'Morning Coffee',
+      poster: 'https://images.unsplash.com/photo-1500673922987-e212871fec22?w=300&h=450&fit=crop',
       genre: 'Drama',
-      rating: 4.8,
-      duration: '128 min',
-      type: 'movie' as const
+      rating: 4.3,
+      duration: '15 min',
+      year: '2024',
+      certificate: 'U',
+      language: 'Hindi',
+      description: 'A heartwarming short film about everyday connections.',
+      type: 'short' as const,
+      hasTicket: false
+    },
+    {
+      id: 8,
+      title: 'The Last Dance',
+      poster: 'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?w=300&h=450&fit=crop',
+      genre: 'Romance',
+      rating: 4.7,
+      duration: '22 min',
+      year: '2024',
+      certificate: 'U/A 13+',
+      language: 'English',
+      description: 'A beautiful story about love and letting go.',
+      type: 'short' as const,
+      hasTicket: false
     }
   ];
 
   return (
-    <div className="min-h-screen">
-      {/* Header */}
-      <header className="flex items-center justify-between p-6">
-        <div>
-          <h1 className="text-2xl font-bold mb-1">Welcome, Angeline 👋</h1>
-          <p className="text-gray-400">Let's relax and watch a movie!</p>
-        </div>
-        <div className="w-12 h-12 bg-tiketx-gradient rounded-full flex items-center justify-center">
-          <User size={24} className="text-white" />
-        </div>
-      </header>
+    <div className="min-h-screen bg-tiketx-navy text-white">
+      {/* Sidebar Navigation */}
+      <SidebarNavigation />
 
-      {/* Search Bar */}
-      <div className="px-6 mb-8">
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-          <input
-            type="text"
-            placeholder="Search movies, series, shows..."
-            className="w-full glass-card pl-12 pr-4 py-4 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-tiketx-blue"
-          />
+      {/* Main Content */}
+      <div className="lg:ml-80">
+        {/* Mobile Header */}
+        <header className="lg:hidden flex items-center justify-between p-6">
+          <div>
+            <h1 className="text-2xl font-bold mb-1">Welcome, Angeline 👋</h1>
+            <p className="text-gray-400">Let's relax and watch a movie!</p>
+          </div>
+          <div className="w-12 h-12 bg-tiketx-gradient rounded-full flex items-center justify-center">
+            <User size={24} className="text-white" />
+          </div>
+        </header>
+
+        {/* Desktop Search & User - Top Bar */}
+        <div className="hidden lg:flex items-center justify-between p-6 border-b border-white/10">
+          <div className="flex-1 max-w-md">
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+              <input
+                type="text"
+                placeholder="Search movies, series, shows..."
+                className="w-full glass-card pl-12 pr-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-tiketx-blue"
+              />
+            </div>
+          </div>
+          <div className="flex items-center space-x-4">
+            <span className="text-lg font-semibold">Welcome, Angeline 👋</span>
+            <div className="w-10 h-10 bg-tiketx-gradient rounded-full flex items-center justify-center">
+              <User size={20} className="text-white" />
+            </div>
+          </div>
         </div>
+
+        {/* Mobile Search Bar */}
+        <div className="lg:hidden px-6 mb-8">
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+            <input
+              type="text"
+              placeholder="Search movies, series, shows..."
+              className="w-full glass-card pl-12 pr-4 py-4 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-tiketx-blue"
+            />
+          </div>
+        </div>
+
+        {/* Hero Banner Slider */}
+        <HeroBannerSlider banners={heroBanners} />
+
+        {/* Categories */}
+        <div className="mb-8">
+          <CategorySlider categories={categories} />
+        </div>
+
+        {/* Content Sections */}
+        <SectionRowCarousel title="Latest Releases" items={latestReleases} sectionId="latest" />
+        <SectionRowCarousel title="Action Picks" items={actionPicks} sectionId="action" />
+        <SectionRowCarousel title="Short Films" items={shortFilms} sectionId="shorts" />
       </div>
-
-      {/* Banner Slider */}
-      <BannerSlider banners={banners} />
-
-      {/* Categories */}
-      <div className="mb-8">
-        <CategorySlider categories={categories} />
-      </div>
-
-      {/* Content Sections */}
-      <SectionRow title="Trending Now" items={trendingNow} sectionId="trending" />
-      <SectionRow title="Director's Picks" items={directorsPicks} sectionId="directors-picks" />
-      <SectionRow title="Regional Favourites" items={regionalFavourites} sectionId="regional" />
     </div>
   );
 };

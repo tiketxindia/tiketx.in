@@ -72,4 +72,13 @@ All colors MUST be HSL.
   .movie-card {
     @apply glass-card p-4 hover:bg-white/10 transition-all duration-300 transform hover:scale-105 cursor-pointer;
   }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
 }
