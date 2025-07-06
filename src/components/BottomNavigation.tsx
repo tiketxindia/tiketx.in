@@ -11,7 +11,7 @@ export const BottomNavigation = () => {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 glass-card m-4 rounded-2xl">
+    <nav className="fixed bottom-0 left-0 right-0 w-full glass-card rounded-2xl pb-[env(safe-area-inset-bottom)] min-h-[64px] z-50">
       <div className="flex justify-around items-center py-3">
         {navItems.map(({ icon: Icon, label, path }) => (
           <NavLink

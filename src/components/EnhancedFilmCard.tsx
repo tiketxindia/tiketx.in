@@ -1,7 +1,8 @@
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Play, Plus, Star, Clock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { createPortal } from 'react-dom';
 
 interface EnhancedFilmCardProps {
   id: number;
@@ -19,6 +20,13 @@ interface EnhancedFilmCardProps {
   type?: 'movie' | 'series' | 'short';
   isInWatchlist?: boolean;
   votes?: number;
+}
+
+// Helper to normalize certificate display
+function getCertificateShort(cert?: string) {
+  if (!cert) return '';
+  if (cert.startsWith('U/A')) return 'U/A';
+  return cert;
 }
 
 export const EnhancedFilmCard = ({ 
@@ -40,18 +48,37 @@ export const EnhancedFilmCard = ({
 }: EnhancedFilmCardProps) => {
   const navigate = useNavigate();
   const [isHovered, setIsHovered] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [overlayReady, setOverlayReady] = useState(false);
 
   const handleMouseEnter = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
     setIsHovered(true);
+    setTimeout(() => setOverlayReady(true), 10);
   };
 
   const handleMouseLeave = () => {
-    setIsHovered(false);
+    hoverTimeoutRef.current = setTimeout(() => {
+      setIsHovered(false);
+      setOverlayReady(false);
+    }, 100);
   };
+
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div 
-      className={`min-w-[160px] md:min-w-[180px] transition-all duration-300 ease-out cursor-pointer relative ${
+      ref={cardRef}
+      className={`min-w-[166px] md:min-w-[186px] transition-all duration-300 ease-out cursor-pointer relative overflow-visible ${
         isHovered ? 'transform scale-105 z-50' : 'z-10'
       }`}
       onMouseEnter={handleMouseEnter}
@@ -66,24 +93,19 @@ export const EnhancedFilmCard = ({
         <img
           src={poster}
           alt={title}
-          className="w-full h-[240px] md:h-[270px] object-cover rounded-lg"
+          className="w-full h-[221px] md:h-[248px] object-cover rounded-lg"
         />
         
-        {/* Certificate Badge - Always visible */}
-        <div className="absolute top-2 right-2 bg-black/80 px-2 py-1 rounded-md text-xs font-medium backdrop-blur-sm border border-white/20">
-          {certificate}
-        </div>
-
         {/* Type Badge */}
         {type !== 'movie' && (
-          <div className="absolute top-2 left-2 bg-tiketx-blue/90 px-2 py-1 rounded-md text-xs font-bold uppercase backdrop-blur-sm">
+          <div className="absolute top-2 left-2 bg-tiketx-blue/90 px-2 py-1 rounded-md text-[12px] font-bold uppercase backdrop-blur-sm">
             {type}
           </div>
         )}
 
         {/* Ticket Status */}
         {hasTicket && (
-          <div className="absolute bottom-2 left-2 bg-green-500/90 px-2 py-1 rounded-md text-xs font-bold backdrop-blur-sm">
+          <div className="absolute bottom-2 left-2 bg-green-500/90 px-2 py-1 rounded-md text-[12px] font-bold backdrop-blur-sm">
             OWNED
           </div>
         )}
@@ -94,77 +116,91 @@ export const EnhancedFilmCard = ({
         <h3 className="font-bold text-sm line-clamp-2 leading-tight text-white">
           {title}
         </h3>
-        
-        {/* Default info - votes instead of genre/duration */}
-        <div className="text-xs text-gray-400">
-          <span className="font-medium">{votes} votes</span>
+        <div className="flex items-center justify-between mt-1">
+          <div className="flex items-center">
+            <Star size={14} className="text-yellow-400 fill-yellow-400 mr-1" fill="currentColor" />
+            <span className="text-xs font-semibold text-white">{rating}</span>
+          </div>
+          <span className="text-xs text-gray-400 font-medium">{votes} votes</span>
         </div>
       </div>
 
-      {/* Hover Details - Floating overlay positioned absolutely */}
+      {/* Hover Details - Absolutely positioned inside card, never blocks overflow */}
       {isHovered && (
-        <div className="fixed bg-black/95 backdrop-blur-lg border border-white/30 rounded-lg p-4 shadow-2xl z-[100] w-72 animate-fade-in pointer-events-none"
-             style={{
-               top: '50%',
-               left: '50%',
-               transform: 'translate(-50%, -50%)',
-               marginTop: '20px'
-             }}>
-          {/* Movie metadata */}
-          <div className="flex flex-wrap items-center text-xs text-gray-300 gap-2 mb-3">
-            <span className="font-semibold">{year}</span>
-            <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
-            <span className="bg-white/20 px-2 py-1 rounded text-xs font-medium">{genre}</span>
-            <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
-            <span>{language}</span>
-            <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
-            <span>{duration}</span>
-          </div>
-
-          {/* Rating */}
-          <div className="flex items-center text-xs text-gray-300 mb-3">
-            <Star size={12} className="text-yellow-400 mr-1" />
-            <span className="font-semibold mr-2">{rating}</span>
-            <span className="text-gray-400">({votes} votes)</span>
-          </div>
-          
-          {/* Description */}
-          <p className="text-gray-300 text-xs line-clamp-2 leading-relaxed mb-4">
-            {description}
-          </p>
-
-          {/* Action buttons */}
-          <div className="flex items-center justify-between pointer-events-auto">
-            <button 
-              className="gradient-button flex items-center space-x-2 text-xs px-3 py-2 rounded-lg font-bold flex-1 mr-2"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (hasTicket) {
-                  navigate(`/watch/${id}`);
-                } else {
-                  navigate(`/movie/${id}`);
-                }
-              }}
-            >
-              {hasTicket ? <Play size={14} /> : <span className="text-sm">🎟️</span>}
-              <span>{hasTicket ? 'Watch Now' : 'Buy Ticket'}</span>
-            </button>
-            <button 
-              className={`glass-card p-2 rounded-full hover:bg-white/30 transition-all duration-300 border-2 border-white/30 ${
-                isInWatchlist ? 'bg-white/20 opacity-100' : 'opacity-70 hover:opacity-100'
-              }`}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Plus size={14} className={isInWatchlist ? 'text-tiketx-blue' : 'text-white'} />
-            </button>
-          </div>
-          
-          {hasTicket && ticketExpiry && (
-            <div className="flex items-center text-xs text-green-400 mt-2">
-              <Clock size={10} className="mr-1" />
-              <span>Valid till: {ticketExpiry}</span>
+        <div
+          className={`absolute left-1/2 top-1/2 w-64 z-[100] flex items-center justify-center ${overlayReady ? 'transition-all duration-300 ease-out opacity-100 scale-100' : 'opacity-0 scale-95'}`}
+          style={{
+            transform: 'translate(-50%, -50%)',
+            pointerEvents: 'auto',
+          }}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+        >
+          <div className="bg-black/95 backdrop-blur-lg rounded-lg p-4 shadow-2xl w-full">
+            {/* 4:3 Poster Image */}
+            <div className="w-full aspect-[4/3] mb-3 rounded-lg overflow-hidden">
+              <img src={poster} alt={title} className="w-full h-full object-cover" />
             </div>
-          )}
+            {/* Movie metadata */}
+            <div className="flex items-center text-xs text-gray-300 gap-2 mb-3 whitespace-nowrap overflow-hidden text-ellipsis min-w-0">
+              <span className="font-semibold shrink-0">{year}</span>
+              <span className="w-1 h-1 bg-gray-400 rounded-full shrink-0"></span>
+              <span className="bg-white/20 px-1.5 py-0.5 rounded text-[10px] font-medium shrink-0">{genre}</span>
+              <span className="w-1 h-1 bg-gray-400 rounded-full shrink-0"></span>
+              <span className="shrink-0">{language}</span>
+              <span className="w-1 h-1 bg-gray-400 rounded-full shrink-0"></span>
+              <span className="shrink-0">{getCertificateShort(certificate)}</span>
+            </div>
+
+            {/* Rating and duration in one line */}
+            <div className="flex items-center text-xs text-gray-300 mb-3 w-full">
+              <div className="flex items-center">
+                <Star size={11} className="text-yellow-400 mr-1" />
+                <span className="font-semibold mr-2">{rating}</span>
+                <span className="text-gray-400">({votes} votes)</span>
+                <span className="mx-2 w-1 h-1 bg-gray-400 rounded-full inline-block"></span>
+                <span className="text-gray-400">{duration}</span>
+              </div>
+            </div>
+            
+            {/* Description */}
+            <p className="text-gray-300 text-xs line-clamp-2 leading-relaxed mb-4">
+              {description}
+            </p>
+
+            {/* Action buttons */}
+            <div className="flex items-center justify-between">
+              <button 
+                className="gradient-button flex items-center space-x-2 text-xs px-3 py-2 rounded-lg font-bold flex-1 mr-2"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (hasTicket) {
+                    navigate(`/watch/${id}`);
+                  } else {
+                    navigate(`/movie/${id}`);
+                  }
+                }}
+              >
+                {hasTicket ? <Play size={12} /> : <span className="text-sm">🎟️</span>}
+                <span>{hasTicket ? 'Watch Now' : 'Buy Ticket'}</span>
+              </button>
+              <button 
+                className={`glass-card p-2 rounded-full hover:bg-white/30 transition-all duration-300 border-2 border-white/30 ${
+                  isInWatchlist ? 'bg-white/20 opacity-100' : 'opacity-70 hover:opacity-100'
+                }`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Plus size={12} className={isInWatchlist ? 'text-tiketx-blue' : 'text-white'} />
+              </button>
+            </div>
+            
+            {hasTicket && ticketExpiry && (
+              <div className="flex items-center text-xs text-green-400 mt-2">
+                <Clock size={8} className="mr-1" />
+                <span>Valid till: {ticketExpiry}</span>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

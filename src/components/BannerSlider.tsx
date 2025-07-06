@@ -73,20 +73,6 @@ export const BannerSlider = ({ banners }: BannerSliderProps) => {
         ))}
       </div>
 
-      {/* Navigation Arrows */}
-      <button
-        onClick={prevSlide}
-        className="absolute left-4 top-1/2 transform -translate-y-1/2 glass-card p-3 rounded-xl hover:bg-white/20 transition-colors"
-      >
-        <ChevronLeft size={24} />
-      </button>
-      <button
-        onClick={nextSlide}
-        className="absolute right-4 top-1/2 transform -translate-y-1/2 glass-card p-3 rounded-xl hover:bg-white/20 transition-colors"
-      >
-        <ChevronRight size={24} />
-      </button>
-
       {/* Dots Indicator */}
       <div className="absolute bottom-4 right-8 flex space-x-2">
         {banners.map((_, index) => (

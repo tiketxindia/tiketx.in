@@ -191,22 +191,9 @@ const Home = () => {
   return (
     <div className="min-h-screen bg-black text-white">
       {/* Main Content - Responsive to sidebar */}
-      <div className="lg:ml-[var(--sidebar-width,288px)] transition-all duration-300">
-        {/* Mobile Header */}
-        <header className="lg:hidden flex items-center justify-between p-6 bg-black/50 backdrop-blur-lg border-b border-white/20">
-          <div>
-            <h1 className="text-2xl font-bold mb-1 bg-gradient-to-r from-tiketx-blue via-tiketx-violet to-tiketx-pink bg-clip-text text-transparent">
-              Welcome, Angeline 👋
-            </h1>
-            <p className="text-gray-400">Let's relax and watch a movie!</p>
-          </div>
-          <div className="w-12 h-12 bg-tiketx-gradient rounded-full flex items-center justify-center">
-            <User size={24} className="text-white" />
-          </div>
-        </header>
-
-        {/* Desktop Search & User - Top Bar */}
-        <div className="hidden lg:flex items-center justify-between p-6 bg-black/30 backdrop-blur-lg border-b border-white/20">
+      <div className="transition-all duration-300">
+        {/* Desktop & Tablet Search & User - Top Bar */}
+        <div className="hidden md:flex items-center justify-between p-6 bg-black/30 backdrop-blur-lg border-b border-white/20">
           <div className="flex-1 max-w-md">
             <div className="relative">
               <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
@@ -227,28 +214,16 @@ const Home = () => {
           </div>
         </div>
 
-        {/* Mobile Search Bar */}
-        <div className="lg:hidden px-6 mb-8">
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-            <input
-              type="text"
-              placeholder="Search movies, series, shows..."
-              className="w-full bg-black/40 border border-white/30 rounded-xl pl-12 pr-4 py-4 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-tiketx-blue focus:border-transparent backdrop-blur-lg"
-            />
-          </div>
-        </div>
-
         {/* Hero Banner Slider */}
-        <HeroBannerSlider banners={heroBanners} />
+        <HeroBannerSlider banners={heroBanners} showMobileOverlay />
 
-        {/* Categories */}
-        <div className="mb-8">
+        {/* Categories - hidden on mobile */}
+        <div className="hidden md:block mb-8">
           <CategorySlider categories={categories} />
         </div>
 
         {/* Content Sections */}
-        <SectionRowCarousel title="Latest Releases" items={latestReleases} sectionId="latest" />
+        <SectionRowCarousel title="Now Showing" items={latestReleases} sectionId="latest" />
         <SectionRowCarousel title="Action Picks" items={actionPicks} sectionId="action" />
         <SectionRowCarousel title="Short Films" items={shortFilms} sectionId="shorts" />
       </div>

@@ -65,6 +65,14 @@ All colors MUST be HSL.
   }
 }
 
+html {
+  font-size: 13.8px;
+}
+
+body{
+  overscroll-behavior: none;
+}
+
 @layer components {
   .gradient-button {
     @apply bg-tiketx-gradient hover:bg-tiketx-gradient-hover text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl;

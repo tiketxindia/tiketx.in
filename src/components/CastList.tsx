@@ -13,15 +13,15 @@ interface CastListProps {
 
 export const CastList = ({ cast, crew }: CastListProps) => {
   return (
-    <div className="px-6 space-y-6">
+    <div className="px-2 sm:px-6">
       {/* Crew */}
       {crew.length > 0 && (
-        <div>
-          <h3 className="text-lg font-semibold mb-4">Crew</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="flex flex-col items-start">
+          <h3 className="text-lg font-semibold mb-2 text-left">Crew</h3>
+          <div className="flex flex-row gap-4 overflow-x-auto whitespace-nowrap w-full pb-2 scrollbar-hide">
             {crew.map((member) => (
-              <div key={member.id} className="text-center">
-                <div className="w-16 h-16 bg-tiketx-gradient rounded-full flex items-center justify-center mx-auto mb-2">
+              <div key={member.id} className="text-center flex-shrink-0" style={{ minWidth: '90px' }}>
+                <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-1 bg-transparent">
                   {member.photo ? (
                     <img
                       src={member.photo}
@@ -29,9 +29,11 @@ export const CastList = ({ cast, crew }: CastListProps) => {
                       className="w-full h-full object-cover rounded-full"
                     />
                   ) : (
-                    <span className="text-white font-semibold text-lg">
-                      {member.name.charAt(0)}
-                    </span>
+                    <img
+                      src="/mobile-logo.png"
+                      alt="Default profile"
+                      className="w-8 h-8 object-contain"
+                    />
                   )}
                 </div>
                 <p className="font-medium text-sm">{member.name}</p>
@@ -44,12 +46,12 @@ export const CastList = ({ cast, crew }: CastListProps) => {
 
       {/* Cast */}
       {cast.length > 0 && (
-        <div>
-          <h3 className="text-lg font-semibold mb-4">Cast</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+        <div className="flex flex-col items-start mt-6">
+          <h3 className="text-lg font-semibold mb-2 text-left">Cast</h3>
+          <div className="flex flex-row gap-4 overflow-x-auto whitespace-nowrap w-full pb-2 scrollbar-hide">
             {cast.slice(0, 10).map((member) => (
-              <div key={member.id} className="text-center">
-                <div className="w-16 h-16 bg-tiketx-gradient rounded-full flex items-center justify-center mx-auto mb-2">
+              <div key={member.id} className="text-center flex-shrink-0" style={{ minWidth: '90px' }}>
+                <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-1 bg-transparent">
                   {member.photo ? (
                     <img
                       src={member.photo}
@@ -57,9 +59,11 @@ export const CastList = ({ cast, crew }: CastListProps) => {
                       className="w-full h-full object-cover rounded-full"
                     />
                   ) : (
-                    <span className="text-white font-semibold text-lg">
-                      {member.name.charAt(0)}
-                    </span>
+                    <img
+                      src="/mobile-logo.png"
+                      alt="Default profile"
+                      className="w-8 h-8 object-contain"
+                    />
                   )}
                 </div>
                 <p className="font-medium text-sm">{member.name}</p>

@@ -103,36 +103,33 @@ const MovieDetail = () => {
       </div>
 
       {/* Content Info */}
-      <div className="px-6 space-y-6">
+      <div className="px-6 space-y-6 pb-28 md:pb-28 pb-32">
         <div>
           <h1 className="text-3xl font-bold mb-3">{content.title}</h1>
           
           <div className="flex flex-wrap gap-2 mb-4">
             {content.genre.map((g) => (
-              <span key={g} className="bg-tiketx-violet/20 text-tiketx-violet px-3 py-1 rounded-lg text-sm">
+              <span key={g} className="bg-transparent text-white px-3 py-1 rounded-lg text-sm font-medium border border-white/20">
                 {g}
               </span>
             ))}
             {content.type === 'series' && (
-              <span className="bg-tiketx-blue/20 text-tiketx-blue px-3 py-1 rounded-lg text-sm">
+              <span className="bg-transparent text-white px-3 py-1 rounded-lg text-sm font-medium border border-white/20">
                 Series
               </span>
             )}
           </div>
 
-          <div className="flex items-center space-x-6 text-gray-300">
-            <div className="flex items-center space-x-2">
-              <span className="text-yellow-400">⭐</span>
-              <span>{content.rating}</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <span className="text-yellow-400">📺</span>
-              <span>IMDb {content.imdbRating}</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Calendar size={16} />
-              <span>{content.runtime}</span>
-            </div>
+          <div className="flex items-center gap-3 text-base font-semibold text-white mb-4">
+            <span className="flex items-center gap-1">
+              <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor" className="text-yellow-400"><path d="M10 15.27L16.18 19l-1.64-7.03L20 7.24l-7.19-.61L10 0 7.19 6.63 0 7.24l5.46 4.73L3.82 19z"/></svg>
+              {content.rating}
+            </span>
+            <span className="w-1 h-1 bg-gray-400 rounded-full inline-block"></span>
+            <span className="flex items-center gap-1">
+              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" className="text-gray-300"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+              {content.runtime}
+            </span>
           </div>
         </div>
 
@@ -149,28 +146,42 @@ const MovieDetail = () => {
         {content.type === 'series' && episodes.length > 0 && (
           <EpisodeList episodes={episodes} seriesId={content.id} />
         )}
-
-        {/* Pricing & CTA */}
-        <div className="glass-card p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-400">
+      </div>
+      {/* Sticky Pricing & CTA Bar */}
+      <div
+        className="fixed bottom-0 left-0 w-full z-50 pointer-events-none movie-buy-bar"
+        style={{ pointerEvents: 'none' }}
+      >
+        {/* Mobile sticky bar: centered, 75% width, zoomed out */}
+        <div
+          className="w-full flex justify-center mb-20 md:mb-0"
+          style={{
+            marginLeft: 'var(--sidebar-width, 0px)',
+            width: 'calc(100% - var(--sidebar-width, 0px))',
+            transition: 'margin-left 0.2s, width 0.2s',
+          }}
+        >
+          <div className="bg-black/90 w-full max-w-none rounded-t-2xl rounded-b-none flex items-center justify-between shadow-2xl px-4 py-2 pb-6 pt-5 pointer-events-auto md:w-full md:mx-0 md:static md:translate-x-0 md:left-0 md:w-full fixed left-1/2 -translate-x-1/2 w-11/12 bottom-20 z-[60] mx-0 md:mb-0 mb-0" >
+            <div className="flex flex-col">
+              <span className="text-sm text-gray-300">
                 {content.type === 'series' ? 'Full Series Access' : 'Limited Time Access'}
-              </p>
-              <p className="text-2xl font-bold text-tiketx-blue">{content.price}</p>
+              </span>
+              <span className="font-bold text-tiketx-blue leading-tight text-2xl md:text-3xl">
+                {typeof content.price === 'string' ? content.price.replace('$', 'Rs.') : content.price}
+              </span>
             </div>
-            <div className="text-right">
-              <p className="text-sm text-gray-400">Available until</p>
-              <p className="text-sm font-semibold">July 15, 2024</p>
+            <button
+              className="gradient-button text-base px-6 py-3 font-bold rounded-2xl mx-4"
+              onClick={() => navigate(`/watch/${content.id}`)}
+            >
+              Buy Tiket
+            </button>
+            <div className="block md:hidden pb-4" />
+            <div className="flex flex-col text-right">
+              <span className="text-sm text-gray-300">Available until</span>
+              <span className="text-base font-bold text-white">July 15, 2024</span>
             </div>
           </div>
-          
-          <button 
-            className="gradient-button w-full text-lg py-4"
-            onClick={() => navigate(`/watch/${content.id}`)}
-          >
-            Get Started
-          </button>
         </div>
       </div>
     </div>

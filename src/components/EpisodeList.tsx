@@ -22,9 +22,9 @@ export const EpisodeList = ({ episodes, seriesId }: EpisodeListProps) => {
 
   return (
     <div className="space-y-4">
-      <h3 className="text-xl font-semibold px-6">Episodes</h3>
+      <h3 className="text-xl font-semibold px-2 sm:px-6">Episodes</h3>
       
-      <div className="px-6 space-y-3">
+      <div className="px-2 sm:px-6 space-y-3">
         {episodes.map((episode) => (
           <div key={episode.id} className="glass-card p-4 rounded-xl">
             <div className="flex items-center space-x-4">
@@ -60,7 +60,7 @@ export const EpisodeList = ({ episodes, seriesId }: EpisodeListProps) => {
                 {episode.hasAccess ? (
                   <button
                     onClick={() => navigate(`/watch/${seriesId}?episode=${episode.id}`)}
-                    className="gradient-button text-sm px-4 py-2"
+                    className="bg-white text-black text-sm px-4 py-2 rounded-xl font-semibold shadow-sm hover:bg-gray-100 transition-colors"
                   >
                     Watch
                   </button>
