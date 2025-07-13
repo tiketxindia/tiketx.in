@@ -74,7 +74,7 @@ export const SectionRowCarousel = ({ title, items, sectionId }: SectionRowCarous
   ) : null;
 
   return (
-    <div className="mb-12">
+    <div className={`mb-12${title === 'Now Showing' ? ' mt-8' : ''}`}>
       <div className="flex items-center justify-between mb-6 px-6 lg:px-12">
         {title === 'Now Showing' ? (
           <h2 className="text-lg md:text-2xl lg:text-3xl font-semibold flex items-center gap-3">

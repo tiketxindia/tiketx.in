@@ -88,13 +88,15 @@ ToastClose.displayName = ToastPrimitives.Close.displayName
 
 const ToastTitle = React.forwardRef<
   React.ElementRef<typeof ToastPrimitives.Title>,
-  React.ComponentPropsWithoutRef<typeof ToastPrimitives.Title>
->(({ className, ...props }, ref) => (
+  Omit<React.ComponentPropsWithoutRef<typeof ToastPrimitives.Title>, 'children'> & { children?: React.ReactNode }
+>(({ className, children, ...props }, ref) => (
   <ToastPrimitives.Title
     ref={ref}
     className={cn("text-sm font-semibold", className)}
     {...props}
-  />
+  >
+    {children}
+  </ToastPrimitives.Title>
 ))
 ToastTitle.displayName = ToastPrimitives.Title.displayName
 
@@ -110,7 +112,7 @@ const ToastDescription = React.forwardRef<
 ))
 ToastDescription.displayName = ToastPrimitives.Description.displayName
 
-type ToastProps = React.ComponentPropsWithoutRef<typeof Toast>
+type ToastProps = Omit<React.ComponentPropsWithoutRef<typeof Toast>, 'title'> & { title?: React.ReactNode };
 
 type ToastActionElement = React.ReactElement<typeof ToastAction>
 

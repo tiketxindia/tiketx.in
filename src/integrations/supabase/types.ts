@@ -9,22 +9,55 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      [_ in never]: never
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
-}
+      banners: {
+        Row: {
+          id: number;
+          title: string;
+          year: string;
+          language: string;
+          duration: string;
+          certificate: string;
+          description: string;
+          genres: string[];
+          backgroundImage: string;
+          posterImage: string;
+          filmId: number;
+          hasTicket: boolean | null;
+          ticketExpiry: string | null;
+          rating: number | null;
+          imdbRating: number | null;
+          branding: string | null;
+        };
+        Insert: Omit<Database["public"]["Tables"]["banners"]["Row"], "id"> & { id?: number };
+        Update: Partial<Database["public"]["Tables"]["banners"]["Row"]>;
+      };
+      movies: {
+        Row: {
+          id: number;
+          title: string;
+          poster: string;
+          genre: string;
+          rating: number;
+          duration: string;
+          year: string;
+          certificate: string;
+          language: string;
+          description: string;
+          type: "movie" | "series" | "short";
+          hasTicket: boolean | null;
+          ticketExpiry: string | null;
+          votes: number | null;
+        };
+        Insert: Omit<Database["public"]["Tables"]["movies"]["Row"], "id"> & { id?: number };
+        Update: Partial<Database["public"]["Tables"]["movies"]["Row"]>;
+      };
+    };
+    Views: {};
+    Functions: {};
+    Enums: {};
+    CompositeTypes: {};
+  };
+};
 
 type DefaultSchema = Database[Extract<keyof Database, "public">]
 

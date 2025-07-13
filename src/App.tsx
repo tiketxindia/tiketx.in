@@ -12,6 +12,7 @@ import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
 import AdminPanel from "./pages/AdminPanel";
 import NotFound from "./pages/NotFound";
+import AdminLogin from "./pages/AdminLogin";
 
 const queryClient = new QueryClient();
 
@@ -22,19 +23,16 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/movie/:id" element={
-            <Layout hideFooter>
-              <MovieDetail />
-            </Layout>
-          } />
           <Route path="*" element={
             <Layout>
               <Routes>
+                <Route path="/admin/login" element={<AdminLogin />} />
                 <Route path="/" element={<Home />} />
                 <Route path="/watch/:id" element={<Watch />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/admin" element={<AdminPanel />} />
+                <Route path="/movie/:id" element={<MovieDetail />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Layout>
