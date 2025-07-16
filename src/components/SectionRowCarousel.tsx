@@ -8,8 +8,8 @@ interface Media {
   id: number;
   title: string;
   poster: string;
+  hoverPoster?: string;
   genre: string;
-  rating: number;
   duration: string;
   year?: string;
   certificate?: string;

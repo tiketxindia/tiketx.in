@@ -16,7 +16,6 @@ const MovieDetail = () => {
     poster: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800&h=1200&fit=crop',
     banner: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=1200&h=600&fit=crop',
     genre: ['Action', 'Adventure', 'Fantasy'],
-    rating: 4.8,
     imdbRating: 6.3,
     runtime: '118 min',
     description: 'Thor embarks on a journey unlike anything he has ever faced – a quest for inner peace. However, his retirement gets interrupted by Gorr the God Butcher, a galactic killer who seeks the extinction of the gods.',
@@ -78,7 +77,7 @@ const MovieDetail = () => {
           <ChevronLeft size={20} />
         </button>
         <h1 className="text-lg font-semibold">
-          {content.type === 'series' ? 'Series Details' : 'Movie Details'}
+          Film Details
         </h1>
         <div className="w-10 h-10" />
       </div>
@@ -108,24 +107,14 @@ const MovieDetail = () => {
           <h1 className="text-3xl font-bold mb-3">{content.title}</h1>
           
           <div className="flex flex-wrap gap-2 mb-4">
-            {content.genre.map((g) => (
+            {Array.isArray(content.genre) ? content.genre.map((g) => (
               <span key={g} className="bg-transparent text-white px-3 py-1 rounded-lg text-sm font-medium border border-white/20">
                 {g}
               </span>
-            ))}
-            {content.type === 'series' && (
-              <span className="bg-transparent text-white px-3 py-1 rounded-lg text-sm font-medium border border-white/20">
-                Series
-              </span>
-            )}
+            )) : null}
           </div>
 
           <div className="flex items-center gap-3 text-base font-semibold text-white mb-4">
-            <span className="flex items-center gap-1">
-              <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor" className="text-yellow-400"><path d="M10 15.27L16.18 19l-1.64-7.03L20 7.24l-7.19-.61L10 0 7.19 6.63 0 7.24l5.46 4.73L3.82 19z"/></svg>
-              {content.rating}
-            </span>
-            <span className="w-1 h-1 bg-gray-400 rounded-full inline-block"></span>
             <span className="flex items-center gap-1">
               <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" className="text-gray-300"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
               {content.runtime}

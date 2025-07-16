@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 const Home = () => {
   const [categories, setCategories] = useState<string[]>([]);
   const [heroBanners, setHeroBanners] = useState<any[]>([]);
+  const [allFilms, setAllFilms] = useState<any[]>([]);
   const [latestReleases, setLatestReleases] = useState<any[]>([]);
   const [actionPicks, setActionPicks] = useState<any[]>([]);
   const [shortFilms, setShortFilms] = useState<any[]>([]);
@@ -19,8 +20,9 @@ const Home = () => {
       if (!error && data) setHeroBanners(data);
     });
     // Fetch movies by section (example: Now Showing, Action Picks, Short Films)
-    supabase.from("movies").select("*").then(({ data, error }) => {
+    supabase.from("films").select("*").then(({ data, error }) => {
       if (!error && data) {
+        setAllFilms(data);
         setLatestReleases(data.filter(m => m.type === "movie"));
         setActionPicks(data.filter(m => m.genre === "Action"));
         setShortFilms(data.filter(m => m.type === "short"));
@@ -30,6 +32,33 @@ const Home = () => {
       }
     });
   }, []);
+
+  // Now Showing logic
+  const nowShowingFilms = allFilms.filter(film =>
+    film.has_ticket &&
+    (!film.film_expiry_date || new Date(film.film_expiry_date) >= new Date())
+  ).map(film => {
+    const genres = Array.isArray(film.genres) ? film.genres : (typeof film.genres === 'string' ? film.genres.split(',').map(g => g.trim()) : []);
+    const languages = Array.isArray(film.language) ? film.language : (typeof film.language === 'string' ? film.language.split(',').map(l => l.trim()) : []);
+    return {
+      id: film.id,
+      title: film.title,
+      poster: film.film_thumbnail_vertical,
+      hoverPoster: film.film_thumbnail_horizontal,
+      genre: genres[0] || '',
+      duration: film.runtime ? `${film.runtime} min` : '',
+      year: film.release_year || '',
+      certificate: film.certificate || '',
+      language: languages[0] || '',
+      description: film.synopsis || '',
+      hasTicket: film.has_ticket,
+      ticketExpiry: film.film_expiry_date,
+      type: film.type || 'movie',
+      ticket_price: film.ticket_price,
+    };
+  });
+
+  console.log("Now Showing Films", nowShowingFilms);
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -61,7 +90,7 @@ const Home = () => {
         <HeroBannerSlider banners={heroBanners.filter(b => b.enabled)} showMobileOverlay />
 
         {/* Content Sections */}
-        <SectionRowCarousel title="Now Showing" items={latestReleases} sectionId="latest" />
+        <SectionRowCarousel title="Now Showing" items={nowShowingFilms} sectionId="now-showing" />
         <SectionRowCarousel title="Action Picks" items={actionPicks} sectionId="action" />
         <SectionRowCarousel title="Short Films" items={shortFilms} sectionId="shorts" />
       </div>

@@ -16,7 +16,6 @@ interface FilmHoverCardProps {
   ticketExpiry?: string;
   isVisible: boolean;
   position: { x: number; y: number };
-  rating?: number;
   isInWatchlist?: boolean;
 }
 
@@ -34,7 +33,6 @@ export const FilmHoverCard = ({
   ticketExpiry, 
   isVisible, 
   position,
-  rating = 4.5,
   isInWatchlist = false
 }: FilmHoverCardProps) => {
   const navigate = useNavigate();
@@ -64,10 +62,6 @@ export const FilmHoverCard = ({
         {/* Title & Rating */}
         <div className="flex items-start justify-between">
           <h3 className="text-xl font-bold text-white line-clamp-2 flex-1">{title}</h3>
-          <div className="flex items-center ml-3 bg-black/50 px-2 py-1 rounded-lg">
-            <Star size={16} className="text-yellow-400 mr-1" />
-            <span className="font-semibold">{rating}</span>
-          </div>
         </div>
 
         {/* Metadata */}

@@ -24,7 +24,6 @@ export type Database = {
           filmId: number;
           hasTicket: boolean | null;
           ticketExpiry: string | null;
-          rating: number | null;
           imdbRating: number | null;
           branding: string | null;
         };
@@ -37,7 +36,6 @@ export type Database = {
           title: string;
           poster: string;
           genre: string;
-          rating: number;
           duration: string;
           year: string;
           certificate: string;

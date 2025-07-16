@@ -182,13 +182,12 @@ const AdminPanel = () => {
     runtime: '',
     language: '',
     quality: '',
-    has_rating: false,
-    rating: '',
     has_funding: false,
     release_year: '',
     is_trailer_enabled: false,
     film_playback_id: '',
     custom_tag: '',
+    trailer_link: '',
   });
 
   // Remove cast_ids and crew_ids from filmForm state
@@ -611,35 +610,19 @@ const AdminPanel = () => {
       horizontalThumbUrl = signedUrlData.signedUrl;
     }
 
-    // Prepare genres, crew_ids, cast_ids as arrays
+    // Prepare genres as array
     let genresArray = [];
     if (Array.isArray(filmForm.genres)) {
       genresArray = filmForm.genres;
     } else if (typeof filmForm.genres === 'string' && filmForm.genres.trim() !== '') {
       genresArray = filmForm.genres.split(',').map((g: string) => g.trim());
     }
-    let crewIdsArray = [];
-    if (Array.isArray(filmForm.crew_ids)) {
-      crewIdsArray = filmForm.crew_ids;
-    } else if (typeof filmForm.crew_ids === 'string' && filmForm.crew_ids.trim() !== '') {
-      crewIdsArray = filmForm.crew_ids.split(',').map((g: string) => g.trim());
-    }
-    let castIdsArray = [];
-    if (Array.isArray(filmForm.cast_ids)) {
-      castIdsArray = filmForm.cast_ids;
-    } else if (typeof filmForm.cast_ids === 'string' && filmForm.cast_ids.trim() !== '') {
-      castIdsArray = filmForm.cast_ids.split(',').map((g: string) => g.trim());
-    }
-
-    const languageArray = filmForm.language
-      ? filmForm.language.split(",").map(l => l.trim()).filter(Boolean)
-      : [];
 
     const runtimeValue = filmForm.runtime === "" ? null : Number(filmForm.runtime);
     const ticketPriceValue = filmForm.ticket_price === "" ? null : Number(filmForm.ticket_price);
-    const ratingValue = filmForm.rating === "" ? null : Number(filmForm.rating);
 
-    const payload = {
+    // Build payload
+    const rawPayload = {
       ...filmForm,
       genres: genresArray,
       trailer_thumbnail: trailerThumbUrl,
@@ -648,11 +631,19 @@ const AdminPanel = () => {
       film_thumbnail_horizontal: horizontalThumbUrl,
       film_playback_id: filmForm.film_playback_id,
       custom_tag: filmForm.custom_tag,
-      language: languageArray,
+      language: typeof filmForm.language === 'string' ? filmForm.language : Array.isArray(filmForm.language) ? filmForm.language.join(', ') : '',
       runtime: runtimeValue,
       ticket_price: ticketPriceValue,
-      rating: ratingValue,
     };
+    // Remove file-related fields not in DB
+    const {
+      fullsizeThumbFile,
+      trailerThumbFile,
+      horizontalThumbFile,
+      trailerFile,
+      verticalThumbFile,
+      ...payload
+    } = rawPayload;
 
     console.log('Film payload:', payload);
 
@@ -733,11 +724,11 @@ const AdminPanel = () => {
       film_thumbnail_horizontal: film.film_thumbnail_horizontal ?? '',
       trailerThumbFile: null,
       fullsizeThumbFile: null,
-      verticalThumbFile: null,
       horizontalThumbFile: null,
       film_playback_id: film.film_playback_id ?? '',
       custom_tag: film.custom_tag ?? '',
       trailerFile: null,
+      language: film.language ?? '',
     });
     setEditingFilmId(film.id);
     setShowFilmModal(true);
@@ -976,7 +967,6 @@ const AdminPanel = () => {
                     <p className="text-sm text-gray-400">{film.language}</p>
                     <div className="flex items-center gap-2 mt-1">
                       <span className={`text-xs font-semibold ${film.has_ticket ? 'text-green-400' : 'text-gray-400'}`}>{film.has_ticket ? 'Has Ticket' : 'No Ticket'}</span>
-                      <span className={`text-xs font-semibold ${film.has_rating ? 'text-yellow-400' : 'text-gray-400'}`}>{film.has_rating ? `Rating: ${film.rating}` : 'No Rating'}</span>
                     </div>
                   </div>
                   <div className="flex space-x-2">
@@ -1033,7 +1023,7 @@ const AdminPanel = () => {
                     <Input
                       placeholder="Expiry Date"
                       type="date"
-                      value={filmForm.film_expiry_date || ""}
+                      value={filmForm.film_expiry_date ? filmForm.film_expiry_date.slice(0, 10) : ""}
                       onChange={e => setFilmForm(f => ({ ...f, film_expiry_date: e.target.value }))}
                     />
 
@@ -1050,6 +1040,8 @@ const AdminPanel = () => {
                       value={filmForm.language || ""}
                       onChange={e => setFilmForm(f => ({ ...f, language: e.target.value }))}
                     />
+                    <label className="block mb-1 mt-2">Trailer Link (YouTube or external URL)</label>
+                    <Input placeholder="Trailer Link (YouTube or external URL)" value={filmForm.trailer_link} onChange={e => setFilmForm(f => ({ ...f, trailer_link: e.target.value }))} />
                   </div>
                   <div className="flex flex-col gap-4">
                     <label className="block mb-1">Trailer Thumbnail</label>

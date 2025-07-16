@@ -7,7 +7,6 @@ interface Media {
   title: string;
   poster: string;
   genre: string;
-  rating: number;
   duration: string;
   type?: 'movie' | 'series' | 'short';
 }
