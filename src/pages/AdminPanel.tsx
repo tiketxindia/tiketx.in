@@ -188,6 +188,7 @@ const AdminPanel = () => {
     film_playback_id: '',
     custom_tag: '',
     trailer_link: '',
+    certificate: '',
   });
 
   // Remove cast_ids and crew_ids from filmForm state
@@ -992,203 +993,258 @@ const AdminPanel = () => {
                     Fill out the details to add or edit a film.
                   </DialogDescription>
                 </DialogHeader>
-                <form className="grid grid-cols-1 md:grid-cols-2 gap-6" onSubmit={handleFilmSubmit}>
-                  <div className="flex flex-col gap-4">
-                    <label className="block mb-1">Title</label>
-                    <Input placeholder="Title" value={filmForm.title} onChange={e => setFilmForm(f => ({ ...f, title: e.target.value }))} required />
-                    <label className="block mb-1 mt-2">Year</label>
-                    <Input placeholder="Year" value={filmForm.release_year} onChange={e => setFilmForm(f => ({ ...f, release_year: e.target.value }))} required />
-                    <label className="block mb-1 mt-2">Synopsis</label>
-                    <Input placeholder="Synopsis" value={filmForm.synopsis} onChange={e => setFilmForm(f => ({ ...f, synopsis: e.target.value }))} />
-                    <label className="block mb-1 mt-2">Genres</label>
-                    <Input placeholder="Genres (comma separated)" value={filmForm.genres} onChange={e => setFilmForm(f => ({ ...f, genres: e.target.value }))} required />
-                    <div className="flex items-center gap-2 mt-2 mb-2">
+                <form className="flex flex-col gap-8" onSubmit={handleFilmSubmit}>
+                  {/* 1. All text fields */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block mb-1">Title</label>
+                      <Input placeholder="Title" value={filmForm.title} onChange={e => setFilmForm(f => ({ ...f, title: e.target.value }))} required />
+                    </div>
+                    <div>
+                      <label className="block mb-1">Year</label>
+                      <Input placeholder="Year" value={filmForm.release_year} onChange={e => setFilmForm(f => ({ ...f, release_year: e.target.value }))} required />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block mb-1 mt-2">Synopsis</label>
+                      <Input placeholder="Synopsis" value={filmForm.synopsis} onChange={e => setFilmForm(f => ({ ...f, synopsis: e.target.value }))} />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block mb-1 mt-2">Genres</label>
+                      <Input placeholder="Genres (comma separated)" value={filmForm.genres} onChange={e => setFilmForm(f => ({ ...f, genres: e.target.value }))} required />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:col-span-2">
+                      <div>
+                        <label className="block mb-1 mt-2">Genres</label>
+                        <Input placeholder="Genres (comma separated)" value={filmForm.genres} onChange={e => setFilmForm(f => ({ ...f, genres: e.target.value }))} required />
+                      </div>
+                      <div>
+                        <label className="block mb-1 mt-2">Certificate</label>
+                        <Input placeholder="Certificate (e.g. U/A, A)" value={filmForm.certificate || ''} onChange={e => setFilmForm(f => ({ ...f, certificate: e.target.value }))} />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 mt-2 mb-2 md:col-span-2">
                       <Switch id="is_trailer_enabled" checked={!!filmForm.is_trailer_enabled} onCheckedChange={checked => setFilmForm(f => ({ ...f, is_trailer_enabled: checked }))} className="scale-90" />
                       <label htmlFor="is_trailer_enabled" className="ml-1 select-none text-xs">Enable Trailer</label>
                     </div>
-                    <label className="block mb-1 mt-2">Film Playback ID</label>
-                    <Input placeholder="Film Playback ID (external or streaming URL)" value={filmForm.film_playback_id} onChange={e => setFilmForm(f => ({ ...f, film_playback_id: e.target.value }))} />
-                    <label className="block mb-1 mt-2">Custom Tag</label>
-                    <Input placeholder="Custom Tag (optional)" value={filmForm.custom_tag} onChange={e => setFilmForm(f => ({ ...f, custom_tag: e.target.value }))} />
-                    <label className="block mb-1 mt-2">Runtime (minutes)</label>
-                    <Input
-                      placeholder="Runtime (e.g. 120)"
-                      type="number"
-                      value={filmForm.runtime ?? ""}
-                      onChange={e => setFilmForm(f => ({ ...f, runtime: e.target.value }))}
-                      min={0}
-                    />
-
-                    <label className="block mb-1 mt-2">Film Expiry Date</label>
-                    <Input
-                      placeholder="Expiry Date"
-                      type="date"
-                      value={filmForm.film_expiry_date ? filmForm.film_expiry_date.slice(0, 10) : ""}
-                      onChange={e => setFilmForm(f => ({ ...f, film_expiry_date: e.target.value }))}
-                    />
-
-                    <label className="block mb-1 mt-2">Quality</label>
-                    <Input
-                      placeholder="Quality (e.g. HD, 4K)"
-                      value={filmForm.quality || ""}
-                      onChange={e => setFilmForm(f => ({ ...f, quality: e.target.value }))}
-                    />
-
-                    <label className="block mb-1 mt-2">Languages</label>
-                    <Input
-                      placeholder="Languages (comma separated, e.g. English, Tamil)"
-                      value={filmForm.language || ""}
-                      onChange={e => setFilmForm(f => ({ ...f, language: e.target.value }))}
-                    />
-                    <label className="block mb-1 mt-2">Trailer Link (YouTube or external URL)</label>
-                    <Input placeholder="Trailer Link (YouTube or external URL)" value={filmForm.trailer_link} onChange={e => setFilmForm(f => ({ ...f, trailer_link: e.target.value }))} />
+                    <div className="md:col-span-2">
+                      <label className="block mb-1 mt-2">Film Playback ID</label>
+                      <Input placeholder="Film Playback ID (external or streaming URL)" value={filmForm.film_playback_id} onChange={e => setFilmForm(f => ({ ...f, film_playback_id: e.target.value }))} />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block mb-1 mt-2">Custom Tag</label>
+                      <Input placeholder="Custom Tag (optional)" value={filmForm.custom_tag} onChange={e => setFilmForm(f => ({ ...f, custom_tag: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label className="block mb-1 mt-2">Runtime (minutes)</label>
+                      <Input placeholder="Runtime (e.g. 120)" type="number" value={filmForm.runtime ?? ""} onChange={e => setFilmForm(f => ({ ...f, runtime: e.target.value }))} min={0} />
+                    </div>
+                    <div>
+                      <label className="block mb-1 mt-2">Film Expiry Date</label>
+                      <Input placeholder="Expiry Date" type="date" value={filmForm.film_expiry_date ? filmForm.film_expiry_date.slice(0, 10) : ""} onChange={e => setFilmForm(f => ({ ...f, film_expiry_date: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label className="block mb-1 mt-2">Quality</label>
+                      <Input placeholder="Quality (e.g. HD, 4K)" value={filmForm.quality || ""} onChange={e => setFilmForm(f => ({ ...f, quality: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label className="block mb-1 mt-2">Languages</label>
+                      <Input placeholder="Languages (comma separated, e.g. English, Tamil)" value={filmForm.language || ""} onChange={e => setFilmForm(f => ({ ...f, language: e.target.value }))} />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block mb-1 mt-2">Trailer Link (YouTube or external URL)</label>
+                      <Input placeholder="Trailer Link (YouTube or external URL)" value={filmForm.trailer_link} onChange={e => setFilmForm(f => ({ ...f, trailer_link: e.target.value }))} />
+                    </div>
                   </div>
-                  <div className="flex flex-col gap-4">
-                    <label className="block mb-1">Trailer Thumbnail</label>
-                    {editingFilmId && filmForm.trailer_thumbnail && (
-                      <div className="flex items-center mb-2 gap-2">
-                        <img src={filmForm.trailer_thumbnail} alt="Trailer Thumbnail Preview" className="max-h-20 rounded shadow" />
-                        <Button type="button" size="sm" variant="destructive" onClick={() => handleRemoveFilmImage('trailer_thumbnail')} disabled={removingFilmImage === 'trailer_thumbnail'} className="text-xs px-2 py-1 h-7">
-                          {removingFilmImage === 'trailer_thumbnail' ? 'Removing...' : 'Remove Image'}
-                        </Button>
-                      </div>
-                    )}
-                    {!editingFilmId && (
-                      <Input type="file" accept="image/*" onChange={e => setFilmForm(f => ({ ...f, trailerThumbFile: e.target.files?.[0] }))} disabled={!!filmForm.trailer_thumbnail} />
-                    )}
-                    <label className="block mb-1 mt-2">Film Thumbnail Fullsize</label>
-                    {editingFilmId && filmForm.film_thumbnail_fullsize && (
-                      <div className="flex items-center mb-2 gap-2">
-                        <img src={filmForm.film_thumbnail_fullsize} alt="Fullsize Thumbnail Preview" className="max-h-20 rounded shadow" />
-                        <Button type="button" size="sm" variant="destructive" onClick={() => handleRemoveFilmImage('fullsize')} disabled={removingFilmImage === 'fullsize'} className="text-xs px-2 py-1 h-7">
-                          {removingFilmImage === 'fullsize' ? 'Removing...' : 'Remove Image'}
-                        </Button>
-                      </div>
-                    )}
-                    {!editingFilmId && (
-                      <Input type="file" accept="image/*" onChange={e => setFilmForm(f => ({ ...f, fullsizeThumbFile: e.target.files?.[0] }))} disabled={!!filmForm.film_thumbnail_fullsize} />
-                    )}
-                    <label className="block mb-1 mt-2">Film Thumbnail Vertical</label>
-                    {editingFilmId && filmForm.film_thumbnail_vertical && (
-                      <div className="flex items-center mb-2 gap-2">
-                        <img src={filmForm.film_thumbnail_vertical} alt="Vertical Thumbnail Preview" className="max-h-20 rounded shadow" />
-                        <Button type="button" size="sm" variant="destructive" onClick={() => handleRemoveFilmImage('vertical')} disabled={removingFilmImage === 'vertical'} className="text-xs px-2 py-1 h-7">
-                          {removingFilmImage === 'vertical' ? 'Removing...' : 'Remove Image'}
-                        </Button>
-                      </div>
-                    )}
-                    {!editingFilmId && (
-                      <Input type="file" accept="image/*" onChange={e => setFilmForm(f => ({ ...f, verticalThumbFile: e.target.files?.[0] }))} disabled={!!filmForm.film_thumbnail_vertical} />
-                    )}
-                    <label className="block mb-1 mt-2">Film Thumbnail Horizontal</label>
-                    {editingFilmId && filmForm.film_thumbnail_horizontal && (
-                      <div className="flex items-center mb-2 gap-2">
-                        <img src={filmForm.film_thumbnail_horizontal} alt="Horizontal Thumbnail Preview" className="max-h-20 rounded shadow" />
-                        <Button type="button" size="sm" variant="destructive" onClick={() => handleRemoveFilmImage('horizontal')} disabled={removingFilmImage === 'horizontal'} className="text-xs px-2 py-1 h-7">
-                          {removingFilmImage === 'horizontal' ? 'Removing...' : 'Remove Image'}
-                        </Button>
-                      </div>
-                    )}
-                    {!editingFilmId && (
-                      <Input type="file" accept="image/*" onChange={e => setFilmForm(f => ({ ...f, horizontalThumbFile: e.target.files?.[0] }))} disabled={!!filmForm.film_thumbnail_horizontal} />
-                    )}
+
+                  {/* 2. All image uploaders and ticket fields */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block mb-1">Trailer Thumbnail</label>
+                      {editingFilmId && filmForm.trailer_thumbnail && (
+                        <div className="flex items-center mb-2 gap-2">
+                          <img src={filmForm.trailer_thumbnail} alt="Trailer Thumbnail Preview" className="max-h-20 rounded shadow" />
+                          <Button type="button" size="sm" variant="destructive" onClick={() => handleRemoveFilmImage('trailer_thumbnail')} disabled={removingFilmImage === 'trailer_thumbnail'} className="text-xs px-2 py-1 h-7">
+                            {removingFilmImage === 'trailer_thumbnail' ? 'Removing...' : 'Remove Image'}
+                          </Button>
+                        </div>
+                      )}
+                      {!editingFilmId && (
+                        <Input type="file" accept="image/*" onChange={e => setFilmForm(f => ({ ...f, trailerThumbFile: e.target.files?.[0] }))} disabled={!!filmForm.trailer_thumbnail} />
+                      )}
+                    </div>
+                    <div>
+                      <label className="block mb-1 mt-2">Film Thumbnail Fullsize</label>
+                      {editingFilmId && filmForm.film_thumbnail_fullsize && (
+                        <div className="flex items-center mb-2 gap-2">
+                          <img src={filmForm.film_thumbnail_fullsize} alt="Fullsize Thumbnail Preview" className="max-h-20 rounded shadow" />
+                          <Button type="button" size="sm" variant="destructive" onClick={() => handleRemoveFilmImage('fullsize')} disabled={removingFilmImage === 'fullsize'} className="text-xs px-2 py-1 h-7">
+                            {removingFilmImage === 'fullsize' ? 'Removing...' : 'Remove Image'}
+                          </Button>
+                        </div>
+                      )}
+                      {!editingFilmId && (
+                        <Input type="file" accept="image/*" onChange={e => setFilmForm(f => ({ ...f, fullsizeThumbFile: e.target.files?.[0] }))} disabled={!!filmForm.film_thumbnail_fullsize} />
+                      )}
+                    </div>
+                    <div>
+                      <label className="block mb-1 mt-2">Film Thumbnail Vertical</label>
+                      {editingFilmId && filmForm.film_thumbnail_vertical && (
+                        <div className="flex items-center mb-2 gap-2">
+                          <img src={filmForm.film_thumbnail_vertical} alt="Vertical Thumbnail Preview" className="max-h-20 rounded shadow" />
+                          <Button type="button" size="sm" variant="destructive" onClick={() => handleRemoveFilmImage('vertical')} disabled={removingFilmImage === 'vertical'} className="text-xs px-2 py-1 h-7">
+                            {removingFilmImage === 'vertical' ? 'Removing...' : 'Remove Image'}
+                          </Button>
+                        </div>
+                      )}
+                      {!editingFilmId && (
+                        <Input type="file" accept="image/*" onChange={e => setFilmForm(f => ({ ...f, verticalThumbFile: e.target.files?.[0] }))} disabled={!!filmForm.film_thumbnail_vertical} />
+                      )}
+                    </div>
+                    <div>
+                      <label className="block mb-1 mt-2">Film Thumbnail Horizontal</label>
+                      {editingFilmId && filmForm.film_thumbnail_horizontal && (
+                        <div className="flex items-center mb-2 gap-2">
+                          <img src={filmForm.film_thumbnail_horizontal} alt="Horizontal Thumbnail Preview" className="max-h-20 rounded shadow" />
+                          <Button type="button" size="sm" variant="destructive" onClick={() => handleRemoveFilmImage('horizontal')} disabled={removingFilmImage === 'horizontal'} className="text-xs px-2 py-1 h-7">
+                            {removingFilmImage === 'horizontal' ? 'Removing...' : 'Remove Image'}
+                          </Button>
+                        </div>
+                      )}
+                      {!editingFilmId && (
+                        <Input type="file" accept="image/*" onChange={e => setFilmForm(f => ({ ...f, horizontalThumbFile: e.target.files?.[0] }))} disabled={!!filmForm.film_thumbnail_horizontal} />
+                      )}
+                    </div>
                     <div className="flex items-center gap-2 mt-2">
                       <Switch id="has_ticket" checked={filmForm.has_ticket} onCheckedChange={checked => setFilmForm(f => ({ ...f, has_ticket: checked }))} />
                       <label htmlFor="has_ticket">Has Ticket</label>
                     </div>
-                    <Input placeholder="Ticket Price" type="text" inputMode="decimal" pattern="[0-9]*" value={filmForm.ticket_price} onChange={e => setFilmForm(f => ({ ...f, ticket_price: e.target.value.replace(/[^0-9.]/g, '') }))} />
+                    <div>
+                      <Input placeholder="Ticket Price" type="text" inputMode="decimal" pattern="[0-9]*" value={filmForm.ticket_price} onChange={e => setFilmForm(f => ({ ...f, ticket_price: e.target.value.replace(/[^0-9.]/g, '') }))} />
+                    </div>
                   </div>
-                  <div className="mt-4">
-                    <h4 className="font-semibold mb-2">Cast</h4>
-                    {cast.map((entry, idx) => (
-                      <div key={idx} className="flex items-center gap-2 mb-2">
-                        <select
-                          value={entry.creator_id || ''}
-                          onChange={e => {
-                            const newCast = [...cast];
-                            newCast[idx].creator_id = e.target.value;
-                            setCast(newCast);
-                          }}
-                          className="border rounded px-2 py-1"
-                        >
-                          <option value="">Select Creator</option>
-                          {creators.map(c => (
-                            <option key={c.id} value={c.id}>{c.name}</option>
-                          ))}
-                        </select>
-                        <Input
-                          placeholder="Character Name"
-                          value={entry.character_name || ''}
-                          onChange={e => {
-                            const newCast = [...cast];
-                            newCast[idx].character_name = e.target.value;
-                            setCast(newCast);
-                          }}
-                          className="w-48"
-                        />
-                        <Input
-                          placeholder="Order"
-                          type="number"
-                          min={1}
-                          value={entry.order || ''}
-                          onChange={e => {
-                            const newCast = [...cast];
-                            newCast[idx].order = e.target.value;
-                            setCast(newCast);
-                          }}
-                          className="w-20"
-                        />
-                        <Button type="button" variant="destructive" size="sm" onClick={() => setCast(cast.filter((_, i) => i !== idx))}>Remove</Button>
+
+                  {/* 3. Cast */}
+                  <div>
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Users className="text-blue-400 w-5 h-5" />
+                        <h4 className="font-semibold text-lg">Cast</h4>
+                        <div className="flex-1 border-b border-gray-700 ml-2" />
                       </div>
-                    ))}
-                    <Button type="button" size="sm" onClick={() => setCast([...cast, { creator_id: '', character_name: '', order: cast.length + 1 }])}>Add Cast Member</Button>
+                      {cast.map((entry, idx) => (
+                        <div key={idx} className="flex items-center gap-x-3 bg-gray-800/80 rounded-xl shadow p-3 w-full">
+                          <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-white font-bold text-base">
+                            {creators.find(c => c.id === entry.creator_id)?.name?.split(' ').map(n => n[0]).join('').toUpperCase() || '?'}
+                          </div>
+                          <select
+                            value={entry.creator_id || ''}
+                            onChange={e => {
+                              const newCast = [...cast];
+                              newCast[idx].creator_id = e.target.value;
+                              setCast(newCast);
+                            }}
+                            className="flex-1 bg-gray-900 text-white border-none focus:ring-2 focus:ring-blue-500 rounded-xl placeholder-gray-400 input-modern min-w-0"
+                          >
+                            <option value="">Select Creator</option>
+                            {creators.map(c => (
+                              <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                          </select>
+                          <Input
+                            placeholder="Character Name"
+                            value={entry.character_name || ''}
+                            onChange={e => {
+                              const newCast = [...cast];
+                              newCast[idx].character_name = e.target.value;
+                              setCast(newCast);
+                            }}
+                            className="flex-1 bg-gray-900 text-white border-none focus:ring-2 focus:ring-blue-500 rounded-xl placeholder-gray-400 input-modern min-w-0"
+                          />
+                          <Input
+                            placeholder="Order"
+                            type="number"
+                            min={1}
+                            value={entry.order || ''}
+                            onChange={e => {
+                              const newCast = [...cast];
+                              newCast[idx].order = e.target.value;
+                              setCast(newCast);
+                            }}
+                            className="w-16 bg-gray-900 text-white border-none focus:ring-2 focus:ring-blue-500 rounded-xl placeholder-gray-400 input-modern"
+                          />
+                          <Button type="button" variant="ghost" size="icon" onClick={() => setCast(cast.filter((_, i) => i !== idx))} className="hover:bg-red-500/20">
+                            <Trash2 className="w-5 h-5 text-red-400" />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button type="button" size="sm" variant="secondary" className="rounded-full px-4 py-2 mt-1 flex items-center gap-2" onClick={() => setCast([...cast, { creator_id: '', character_name: '', order: cast.length + 1 }])}>
+                        <Plus className="w-4 h-4" /> Add Cast Member
+                      </Button>
+                    </div>
                   </div>
-                  <div className="mt-4">
-                    <h4 className="font-semibold mb-2">Crew</h4>
-                    {crew.map((entry, idx) => (
-                      <div key={idx} className="flex items-center gap-2 mb-2">
-                        <select
-                          value={entry.creator_id || ''}
-                          onChange={e => {
-                            const newCrew = [...crew];
-                            newCrew[idx].creator_id = e.target.value;
-                            setCrew(newCrew);
-                          }}
-                          className="border rounded px-2 py-1"
-                        >
-                          <option value="">Select Creator</option>
-                          {creators.map(c => (
-                            <option key={c.id} value={c.id}>{c.name}</option>
-                          ))}
-                        </select>
-                        <Input
-                          placeholder="Role (e.g. Director)"
-                          value={entry.role || ''}
-                          onChange={e => {
-                            const newCrew = [...crew];
-                            newCrew[idx].role = e.target.value;
-                            setCrew(newCrew);
-                          }}
-                          className="w-48"
-                        />
-                        <Input
-                          placeholder="Order"
-                          type="number"
-                          min={1}
-                          value={entry.order || ''}
-                          onChange={e => {
-                            const newCrew = [...crew];
-                            newCrew[idx].order = e.target.value;
-                            setCrew(newCrew);
-                          }}
-                          className="w-20"
-                        />
-                        <Button type="button" variant="destructive" size="sm" onClick={() => setCrew(crew.filter((_, i) => i !== idx))}>Remove</Button>
+
+                  {/* 4. Crew */}
+                  <div>
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Users className="text-violet-400 w-5 h-5" />
+                        <h4 className="font-semibold text-lg">Crew</h4>
+                        <div className="flex-1 border-b border-gray-700 ml-2" />
                       </div>
-                    ))}
-                    <Button type="button" size="sm" onClick={() => setCrew([...crew, { creator_id: '', role: '', order: crew.length + 1 }])}>Add Crew Member</Button>
+                      {crew.map((entry, idx) => (
+                        <div key={idx} className="flex items-center gap-x-3 bg-gray-800/80 rounded-xl shadow p-3 w-full">
+                          <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-white font-bold text-base">
+                            {creators.find(c => c.id === entry.creator_id)?.name?.split(' ').map(n => n[0]).join('').toUpperCase() || '?'}
+                          </div>
+                          <select
+                            value={entry.creator_id || ''}
+                            onChange={e => {
+                              const newCrew = [...crew];
+                              newCrew[idx].creator_id = e.target.value;
+                              setCrew(newCrew);
+                            }}
+                            className="flex-1 bg-gray-900 text-white border-none focus:ring-2 focus:ring-violet-500 rounded-xl placeholder-gray-400 input-modern min-w-0"
+                          >
+                            <option value="">Select Creator</option>
+                            {creators.map(c => (
+                              <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                          </select>
+                          <Input
+                            placeholder="Role (e.g. Director)"
+                            value={entry.role || ''}
+                            onChange={e => {
+                              const newCrew = [...crew];
+                              newCrew[idx].role = e.target.value;
+                              setCrew(newCrew);
+                            }}
+                            className="flex-1 bg-gray-900 text-white border-none focus:ring-2 focus:ring-violet-500 rounded-xl placeholder-gray-400 input-modern min-w-0"
+                          />
+                          <Input
+                            placeholder="Order"
+                            type="number"
+                            min={1}
+                            value={entry.order || ''}
+                            onChange={e => {
+                              const newCrew = [...crew];
+                              newCrew[idx].order = e.target.value;
+                              setCrew(newCrew);
+                            }}
+                            className="w-16 bg-gray-900 text-white border-none focus:ring-2 focus:ring-violet-500 rounded-xl placeholder-gray-400 input-modern"
+                          />
+                          <Button type="button" variant="ghost" size="icon" onClick={() => setCrew(crew.filter((_, i) => i !== idx))} className="hover:bg-red-500/20">
+                            <Trash2 className="w-5 h-5 text-red-400" />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button type="button" size="sm" variant="secondary" className="rounded-full px-4 py-2 mt-1 flex items-center gap-2" onClick={() => setCrew([...crew, { creator_id: '', role: '', order: crew.length + 1 }])}>
+                        <Plus className="w-4 h-4" /> Add Crew Member
+                      </Button>
+                    </div>
                   </div>
-                  <div className="col-span-1 md:col-span-2 flex justify-end gap-2 mt-4">
+
+                  {/* Actions (full width) */}
+                  <div className="flex justify-end gap-2 mt-4">
                     <Button type="button" variant="secondary" onClick={() => setShowFilmModal(false)}>Cancel</Button>
                     <Button type="submit" variant="default" disabled={savingFilm}>
                       {savingFilm ? (<><Spinner /> Saving...</>) : (editingFilmId ? 'Save Changes' : 'Add Film')}
