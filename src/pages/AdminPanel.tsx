@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Upload, Image, Users, BarChart3, Settings, Plus, Edit, Trash2, CheckCircle, Film, GripVertical } from 'lucide-react';
+import { Upload, Image, Users, BarChart3, Settings, Plus, Edit, Trash2, CheckCircle, Film, GripVertical, Ticket } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import {
@@ -188,7 +188,7 @@ const AdminPanel = () => {
     film_playback_id: '',
     custom_tag: '',
     trailer_link: '',
-    certificate: '',
+    censor_certificate: '',
   });
 
   // Remove cast_ids and crew_ids from filmForm state
@@ -1008,23 +1008,25 @@ const AdminPanel = () => {
                       <label className="block mb-1 mt-2">Synopsis</label>
                       <Input placeholder="Synopsis" value={filmForm.synopsis} onChange={e => setFilmForm(f => ({ ...f, synopsis: e.target.value }))} />
                     </div>
-                    <div className="md:col-span-2">
-                      <label className="block mb-1 mt-2">Genres</label>
-                      <Input placeholder="Genres (comma separated)" value={filmForm.genres} onChange={e => setFilmForm(f => ({ ...f, genres: e.target.value }))} required />
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:col-span-2">
+                    <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block mb-1 mt-2">Genres</label>
                         <Input placeholder="Genres (comma separated)" value={filmForm.genres} onChange={e => setFilmForm(f => ({ ...f, genres: e.target.value }))} required />
                       </div>
                       <div>
                         <label className="block mb-1 mt-2">Certificate</label>
-                        <Input placeholder="Certificate (e.g. U/A, A)" value={filmForm.certificate || ''} onChange={e => setFilmForm(f => ({ ...f, certificate: e.target.value }))} />
+                        <Input placeholder="Certificate (e.g. U/A, A)" value={filmForm.censor_certificate || ''} onChange={e => setFilmForm(f => ({ ...f, censor_certificate: e.target.value }))} />
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 mt-2 mb-2 md:col-span-2">
-                      <Switch id="is_trailer_enabled" checked={!!filmForm.is_trailer_enabled} onCheckedChange={checked => setFilmForm(f => ({ ...f, is_trailer_enabled: checked }))} className="scale-90" />
-                      <label htmlFor="is_trailer_enabled" className="ml-1 select-none text-xs">Enable Trailer</label>
+                    <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block mb-1 mt-2">Trailer Link (YouTube or external URL)</label>
+                        <Input placeholder="Trailer Link (YouTube or external URL)" value={filmForm.trailer_link} onChange={e => setFilmForm(f => ({ ...f, trailer_link: e.target.value }))} />
+                      </div>
+                      <div className="flex items-center gap-2 mt-7">
+                        <Switch id="is_trailer_enabled" checked={!!filmForm.is_trailer_enabled} onCheckedChange={checked => setFilmForm(f => ({ ...f, is_trailer_enabled: checked }))} className="scale-90" />
+                        <label htmlFor="is_trailer_enabled" className="ml-1 select-none text-xs">Enable Trailer</label>
+                      </div>
                     </div>
                     <div className="md:col-span-2">
                       <label className="block mb-1 mt-2">Film Playback ID</label>
@@ -1049,10 +1051,6 @@ const AdminPanel = () => {
                     <div>
                       <label className="block mb-1 mt-2">Languages</label>
                       <Input placeholder="Languages (comma separated, e.g. English, Tamil)" value={filmForm.language || ""} onChange={e => setFilmForm(f => ({ ...f, language: e.target.value }))} />
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="block mb-1 mt-2">Trailer Link (YouTube or external URL)</label>
-                      <Input placeholder="Trailer Link (YouTube or external URL)" value={filmForm.trailer_link} onChange={e => setFilmForm(f => ({ ...f, trailer_link: e.target.value }))} />
                     </div>
                   </div>
 
@@ -1114,7 +1112,15 @@ const AdminPanel = () => {
                         <Input type="file" accept="image/*" onChange={e => setFilmForm(f => ({ ...f, horizontalThumbFile: e.target.files?.[0] }))} disabled={!!filmForm.film_thumbnail_horizontal} />
                       )}
                     </div>
-                    <div className="flex items-center gap-2 mt-2">
+                  </div>
+                  {/* Ticketing Details Section Header - moved here */}
+                  <div className="flex items-center gap-2">
+                    <Ticket className="text-green-400 w-5 h-5" />
+                    <h4 className="font-semibold text-lg">Ticketing Details</h4>
+                    <div className="flex-1 border-b border-gray-700 ml-2" />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
+                    <div className="flex items-center gap-2">
                       <Switch id="has_ticket" checked={filmForm.has_ticket} onCheckedChange={checked => setFilmForm(f => ({ ...f, has_ticket: checked }))} />
                       <label htmlFor="has_ticket">Has Ticket</label>
                     </div>

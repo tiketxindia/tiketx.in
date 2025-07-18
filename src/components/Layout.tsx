@@ -8,14 +8,14 @@ import Footer from './Footer';
 
 interface LayoutProps {
   children: ReactNode;
-  hideFooter?: boolean;
 }
 
-export const Layout = ({ children, hideFooter }: LayoutProps) => {
+export const Layout = ({ children }: LayoutProps) => {
   const isMobile = useIsMobile();
   const location = useLocation();
   const isDashboard = location.pathname.startsWith('/dashboard');
   const isAdmin = location.pathname.startsWith('/admin');
+  const hideFooter = location.pathname.startsWith('/movie/');
 
   return (
     <div className="min-h-screen h-auto flex flex-row items-stretch bg-black text-white">

@@ -13,6 +13,7 @@ import Profile from "./pages/Profile";
 import AdminPanel from "./pages/AdminPanel";
 import NotFound from "./pages/NotFound";
 import AdminLogin from "./pages/AdminLogin";
+import MyTikets from "./pages/MyTikets";
 
 const queryClient = new QueryClient();
 
@@ -33,6 +34,7 @@ const App = () => (
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/admin" element={<AdminPanel />} />
                 <Route path="/movie/:id" element={<MovieDetail />} />
+                <Route path="/my-tikets" element={<MyTikets />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Layout>

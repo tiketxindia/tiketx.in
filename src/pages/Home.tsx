@@ -13,6 +13,7 @@ const Home = () => {
   const [latestReleases, setLatestReleases] = useState<any[]>([]);
   const [actionPicks, setActionPicks] = useState<any[]>([]);
   const [shortFilms, setShortFilms] = useState<any[]>([]);
+  const [userTickets, setUserTickets] = useState<Record<string, any>>({});
 
   useEffect(() => {
     // Fetch banners
@@ -31,6 +32,24 @@ const Home = () => {
         setCategories(genres);
       }
     });
+    // Fetch user tickets
+    (async () => {
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user) return;
+      const { data: tickets, error } = await supabase
+        .from('film_tickets')
+        .select('film_id, expiry_date')
+        .eq('user_id', user.id)
+        .eq('is_active', true);
+      if (!error && tickets) {
+        // Map film_id to ticket
+        const ticketMap: Record<string, any> = {};
+        tickets.forEach(t => {
+          ticketMap[t.film_id] = t;
+        });
+        setUserTickets(ticketMap);
+      }
+    })();
   }, []);
 
   // Now Showing logic
@@ -40,6 +59,8 @@ const Home = () => {
   ).map(film => {
     const genres = Array.isArray(film.genres) ? film.genres : (typeof film.genres === 'string' ? film.genres.split(',').map(g => g.trim()) : []);
     const languages = Array.isArray(film.language) ? film.language : (typeof film.language === 'string' ? film.language.split(',').map(l => l.trim()) : []);
+    const userTicket = userTickets[film.id];
+    const ticketExpiry = userTicket && userTicket.expiry_date ? userTicket.expiry_date : null;
     return {
       id: film.id,
       title: film.title,
@@ -51,8 +72,8 @@ const Home = () => {
       certificate: film.certificate || '',
       language: languages[0] || '',
       description: film.synopsis || '',
-      hasTicket: film.has_ticket,
-      ticketExpiry: film.film_expiry_date,
+      hasTicket: !!userTicket && ticketExpiry && new Date(ticketExpiry) > new Date(),
+      ticketExpiry,
       type: film.type || 'movie',
       ticket_price: film.ticket_price,
     };

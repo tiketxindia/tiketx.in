@@ -3,6 +3,8 @@ import { useState, useRef, useEffect } from 'react';
 import { Play, Plus, Star, Clock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
+import { formatDistanceStrict } from 'date-fns';
+import { IoTicket } from 'react-icons/io5';
 
 interface EnhancedFilmCardProps {
   id: number;
@@ -51,6 +53,9 @@ export const EnhancedFilmCard = ({
   const cardRef = useRef<HTMLDivElement>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [overlayReady, setOverlayReady] = useState(false);
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+
+  const isTicketActive = hasTicket && ticketExpiry && new Date(ticketExpiry) > new Date();
 
   const handleMouseEnter = () => {
     if (hoverTimeoutRef.current) {
@@ -75,6 +80,30 @@ export const EnhancedFilmCard = ({
     };
   }, []);
 
+  useEffect(() => {
+    if (isTicketActive && ticketExpiry) {
+      const updateTimer = () => {
+        const expiry = new Date(ticketExpiry).getTime();
+        const now = Date.now();
+        const diff = Math.max(0, Math.floor((expiry - now) / 1000));
+        setTimeLeft(diff > 0 ? diff : 0);
+      };
+      updateTimer();
+      const interval = setInterval(updateTimer, 1000);
+      return () => clearInterval(interval);
+    } else {
+      setTimeLeft(null);
+    }
+  }, [isTicketActive, ticketExpiry]);
+
+  function formatCountdown(seconds: number | null) {
+    if (seconds === null) return '';
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  }
+
   return (
     <div
       ref={cardRef}
@@ -92,6 +121,14 @@ export const EnhancedFilmCard = ({
         transition: 'transform 0.3s cubic-bezier(0.4,0,0.2,1), box-shadow 0.3s cubic-bezier(0.4,0,0.2,1)',
       }}
     >
+      {/* Ribbon Badge */}
+      {isTicketActive && (
+        <div className="absolute top-3 left-3 z-30">
+          <span className="bg-gradient-to-r from-tiketx-blue to-tiketx-pink text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg flex items-center gap-1">
+            <IoTicket className="w-4 h-4" /> Bought
+          </span>
+        </div>
+      )}
       {/* Left Notch */}
       <div className="ticket-left-notch"></div>
       {/* Poster Container */}
@@ -132,8 +169,22 @@ export const EnhancedFilmCard = ({
             }}
           />
         </svg>
-        {/* Buy Ticket Button absolutely centered on the tear line, only on hover */}
-        {isHovered && (
+        {/* Watch Now Play Button (bottom right, always visible if ticket active) */}
+        {isTicketActive && (
+          <button
+            className="absolute bottom-3 right-3 bg-gradient-to-r from-tiketx-blue to-tiketx-pink text-white rounded-full p-4 shadow-lg flex items-center justify-center z-30 hover:scale-110 transition-transform"
+            style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.25)' }}
+            onClick={e => {
+              e.stopPropagation();
+              navigate(`/watch/${id}`);
+            }}
+            aria-label="Watch Now"
+          >
+            <Play size={28} />
+          </button>
+        )}
+        {/* Buy Ticket Button absolutely centered on the tear line, only on hover and if not ticket active */}
+        {!isTicketActive && isHovered && (
           <button
             className="gradient-button px-8 py-3 rounded-xl text-base font-bold shadow-lg absolute left-1/2"
             style={{
@@ -151,10 +202,18 @@ export const EnhancedFilmCard = ({
           </button>
         )}
       </div>
-
+      {/* Expiry Timer (between image and title) */}
+      {isTicketActive && timeLeft !== null && (
+        <div className="flex items-center justify-center mt-2 mb-1">
+          <span className={`flex items-center gap-2 font-medium text-xs py-2 ${timeLeft <= 36000 ? 'text-red-500' : 'text-green-500'}`}>
+            <Clock className="w-4 h-4" />
+            Tiket Validity : {formatCountdown(timeLeft)} left
+          </span>
+        </div>
+      )}
       {/* Bottom Section (text area) */}
       <div
-        className="space-y-2 px-4 pb-2 pt-5"
+        className="space-y-2 px-4 pb-2 pt-5 relative"
         style={{
           background: 'rgba(17,17,17,0.7)',
           backdropFilter: 'blur(8px)',
@@ -174,6 +233,8 @@ export const EnhancedFilmCard = ({
           </div>
           <span className="text-xs text-gray-400 font-medium">{duration}</span>
         </div>
+        {/* Timer and badge at the bottom if ticket active */}
+        {/* (Removed from here, now above title) */}
       </div>
     </div>
   );
