@@ -9,7 +9,6 @@ export const SidebarNavigation = () => {
   const navItems = [
     { icon: Home, label: 'Home', path: '/' },
     { icon: Search, label: 'Search', path: '/search' },
-    { icon: Grid3X3, label: 'Categories', path: '/categories' },
     { icon: Bookmark, label: 'Watchlist', path: '/watchlist' },
     { icon: Ticket, label: 'My Tikets', path: '/my-tikets' },
     { icon: Settings, label: 'Settings', path: '/settings' }

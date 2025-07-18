@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight, Play, Plus, Clock, Star, Ticket, User, Volum
 import { useNavigate } from 'react-router-dom';
 import { IoTicketOutline } from "react-icons/io5";
 import React from 'react';
-// import { LoginSignupModal } from "./LoginSignupModal";
+import { LoginSignupModal } from "./LoginSignupModal";
 import { supabase } from "@/integrations/supabase/client";
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import Hls from 'hls.js';
@@ -27,14 +27,16 @@ interface HeroBanner {
   custom_tag?: string; // Added custom_tag to the interface
   enable_trailer?: boolean;
   trailer_link?: string;
+  filmid?: string; // Added filmid to the interface
 }
 
 interface HeroBannerSliderProps {
   banners: HeroBanner[];
+  userTickets: Record<string, any>;
   showMobileOverlay?: boolean;
 }
 
-export const HeroBannerSlider = ({ banners, showMobileOverlay }: HeroBannerSliderProps) => {
+export const HeroBannerSlider = ({ banners, userTickets, showMobileOverlay }: HeroBannerSliderProps) => {
   // All hooks at the very top
   const [currentSlide, setCurrentSlide] = useState(0);
   const navigate = useNavigate();
@@ -47,18 +49,19 @@ export const HeroBannerSlider = ({ banners, showMobileOverlay }: HeroBannerSlide
   const [isMuted, setIsMuted] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
   const currentBanner = banners[currentSlide];
+  // Get filmId from banner (may be string or number)
+  const filmid = currentBanner?.filmid;
+  const hasTicket = filmid && userTickets && userTickets[filmid];
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [loginRedirectPath, setLoginRedirectPath] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
-  // All useEffects and logic that use currentBanner go here
-  React.useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user || null);
-    });
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setCurrentUser(data?.user || null));
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user || null);
+      setCurrentUser(session?.user || null);
     });
-    return () => {
-      listener?.subscription.unsubscribe();
-    };
+    return () => listener?.subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -135,6 +138,20 @@ export const HeroBannerSlider = ({ banners, showMobileOverlay }: HeroBannerSlide
     setCurrentSlide(index);
     setIsVideoVisible(false); // Resume auto-advance after dot click
   };
+
+  // Helper to format expiry date
+  function formatExpiry(dateString: string) {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+  }
 
   // Mobile overlay for logo/profile
   const MobileOverlay = () => (
@@ -234,17 +251,63 @@ export const HeroBannerSlider = ({ banners, showMobileOverlay }: HeroBannerSlide
               </>
             )}
           </div>
-          <div className="flex items-center gap-3 mb-6">
-            <button 
-              className="gradient-button flex items-center justify-center space-x-2 text-lg px-8 py-4 font-bold rounded-xl"
-              onClick={() => navigate(`/watch/${currentBanner.id}`)}
-            >
-              <Play size={28} />
-              <span>Watch Now</span>
-            </button>
+          <div className="mb-6 w-full">
+            {filmid && hasTicket && (
+              <div className="flex items-center gap-2 mb-3 px-4 py-2 rounded-full text-white text-base font-bold w-fit" style={{marginLeft: 0, fontSize: '1.1rem'}}>
+                <IoTicketOutline className="w-5 h-5" />
+                Bought
+              </div>
+            )}
+            <div className="flex flex-row items-center gap-3">
+            {filmid ? (
+              hasTicket ? (
+                <button
+                  className="gradient-button flex items-center justify-center space-x-2 text-lg px-8 py-4 font-bold rounded-xl"
+                  onClick={() => {
+                    if (!currentUser) {
+                      setLoginRedirectPath(`/watch/${filmid}`);
+                      setLoginModalOpen(true);
+                    } else {
+                      navigate(`/watch/${filmid}`);
+                    }
+                  }}
+                >
+                  <Play size={28} />
+                  <span>Watch Now</span>
+                </button>
+              ) : (
+                <button
+                  className="gradient-button flex items-center justify-center space-x-2 text-lg px-8 py-4 font-bold rounded-xl"
+                  onClick={() => {
+                    if (!currentUser) {
+                      setLoginRedirectPath(`/movie/${filmid}`);
+                      setLoginModalOpen(true);
+                    } else {
+                      navigate(`/movie/${filmid}`);
+                    }
+                  }}
+                >
+                  <IoTicketOutline size={28} />
+                  <span>Buy Ticket</span>
+                </button>
+              )
+            ) : (
+              <button
+                className="gradient-button flex items-center justify-center space-x-2 text-lg px-8 py-4 font-bold rounded-xl opacity-60 cursor-not-allowed"
+                disabled
+              >
+                <span>Coming Soon</span>
+              </button>
+            )}
             <button className="glass-card p-4 rounded-xl hover:bg-white/20 transition-colors opacity-70 hover:opacity-100 border-2 border-white/30 flex items-center justify-center">
               <Plus size={28} className="text-white" />
             </button>
+            </div>
+            {filmid && hasTicket && userTickets[filmid]?.expiry_date && (
+              <div className="mt-3 text-base text-white/80 drop-shadow-lg">
+                Watch Before: {formatExpiry(userTickets[filmid].expiry_date)}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -357,6 +420,18 @@ export const HeroBannerSlider = ({ banners, showMobileOverlay }: HeroBannerSlide
       </div>
       {/* Place modal at root of component */}
       {/* <LoginSignupModal open={showAuthModal} onOpenChange={setShowAuthModal} redirectPath={authRedirect} /> */}
+      {/* Login Modal for privileged actions */}
+      <LoginSignupModal
+        open={loginModalOpen}
+        onOpenChange={open => {
+          setLoginModalOpen(open);
+          if (!open && loginRedirectPath) {
+            navigate(loginRedirectPath);
+            setLoginRedirectPath(null);
+          }
+        }}
+        redirectPath={loginRedirectPath}
+      />
     </div>
   );
 };

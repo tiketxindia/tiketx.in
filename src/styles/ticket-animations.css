@@ -13,4 +13,24 @@
 }
 .animate-pop {
   animation: pop 0.4s cubic-bezier(.4,0,.2,1) both;
+}
+
+.dotted-gradient-line {
+  position: relative;
+  height: 0.7px;
+  width: 100%;
+  margin: 0.5rem 0;
+  background: linear-gradient(to right, #3b82f6, #a21caf, #ec4899);
+}
+.dotted-gradient-line::after {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; right: 0; bottom: 0;
+  background: repeating-linear-gradient(
+    to right,
+    #18181b 0 2px,
+    transparent 2px 8px
+  );
+  opacity: 0.7;
+  pointer-events: none;
 } 

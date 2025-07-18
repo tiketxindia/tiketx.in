@@ -156,6 +156,7 @@ const AdminPanel = () => {
     custom_tag: '',
     trailerFile: null,
     enable_trailer: false,
+    filmid: '',
   });
   const [uploading, setUploading] = useState(false);
   const [uploadingTrailer, setUploadingTrailer] = useState(false);
@@ -352,6 +353,7 @@ const AdminPanel = () => {
         custom_tag: bannerForm.custom_tag,
         trailerFile: trailerUrl,
         enable_trailer: !!bannerForm.enable_trailer,
+        filmid: bannerForm.filmid || null,
       };
       console.log('Banner payload:', payload);
       let error;
@@ -382,6 +384,7 @@ const AdminPanel = () => {
           custom_tag: '',
           trailerFile: null,
           enable_trailer: false,
+          filmid: '',
         });
         setEditingBannerId(null);
         toast({
@@ -884,6 +887,18 @@ const AdminPanel = () => {
                     <Input placeholder="Year" value={bannerForm.year} onChange={e => setBannerForm(f => ({ ...f, year: e.target.value }))} required />
                     <Input placeholder="Language" value={bannerForm.language} onChange={e => setBannerForm(f => ({ ...f, language: e.target.value }))} required />
                     <Input placeholder="Duration" value={bannerForm.duration} onChange={e => setBannerForm(f => ({ ...f, duration: e.target.value }))} required />
+                    <label className="block mb-1 mt-2">Link to Film (optional)</label>
+                    <select
+                      className="rounded-lg bg-black/80 border border-white/20 text-white px-4 py-2 focus:outline-none focus:ring-2 focus:ring-tiketx-blue transition-all shadow-sm placeholder-gray-400"
+                      value={bannerForm.filmid || ''}
+                      onChange={e => setBannerForm(f => ({ ...f, filmid: e.target.value }))}
+                      style={{ minHeight: '44px', fontSize: '1rem', marginBottom: '0.5rem' }}
+                    >
+                      <option value="" className="bg-black text-white">-- No Film (Coming Soon) --</option>
+                      {films.map(film => (
+                        <option key={film.id} value={film.id} className="bg-black text-white">{film.title}</option>
+                      ))}
+                    </select>
                   </div>
                   <div className="flex flex-col gap-4">
                     <Input placeholder="Certificate" value={bannerForm.certificate} onChange={e => setBannerForm(f => ({ ...f, certificate: e.target.value }))} required />
@@ -1440,6 +1455,13 @@ const AdminPanel = () => {
   const Spinner = () => (
     <span className="inline-block w-4 h-4 border-2 border-t-transparent border-white rounded-full animate-spin align-middle"></span>
   );
+
+  // Add this useEffect to ensure films are loaded when the banner modal is opened
+  useEffect(() => {
+    if (showBannerModal && films.length === 0) {
+      fetchFilms();
+    }
+  }, [showBannerModal]);
 
   return (
     <div className="min-h-screen bg-tiketx-navy">

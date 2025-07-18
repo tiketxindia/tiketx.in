@@ -1,10 +1,23 @@
 
-import { Search, User } from 'lucide-react';
+import { Search, User, LogOut, LogIn } from 'lucide-react';
 import { CategorySlider } from '@/components/CategorySlider';
 import { HeroBannerSlider } from '@/components/HeroBannerSlider';
 import { SectionRowCarousel } from '@/components/SectionRowCarousel';
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { createPortal } from 'react-dom';
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from '@/components/ui/alert-dialog';
+import { LoginSignupModal } from '@/components/LoginSignupModal';
 
 const Home = () => {
   const [categories, setCategories] = useState<string[]>([]);
@@ -14,6 +27,12 @@ const Home = () => {
   const [actionPicks, setActionPicks] = useState<any[]>([]);
   const [shortFilms, setShortFilms] = useState<any[]>([]);
   const [userTickets, setUserTickets] = useState<Record<string, any>>({});
+  const [user, setUser] = useState<any>(null);
+  const [displayName, setDisplayName] = useState<string | null>(null);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileBtnRef = useRef<HTMLDivElement>(null);
+  const [confirmLogout, setConfirmLogout] = useState(false);
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
 
   useEffect(() => {
     // Fetch banners
@@ -50,7 +69,85 @@ const Home = () => {
         setUserTickets(ticketMap);
       }
     })();
+    // Fetch user for welcome message
+    (async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data?.user) {
+        setUser(data.user);
+        // If no user_metadata.name, try users table
+        if (!data.user.user_metadata?.name) {
+          const { data: userRow } = await supabase
+            .from('users')
+            .select('display_name')
+            .eq('id', data.user.id)
+            .single();
+          if (userRow?.display_name) setDisplayName(userRow.display_name);
+        }
+      }
+    })();
+    // Listen for auth state changes to auto-refresh after login
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN') {
+        // Re-fetch user info and tickets
+        (async () => {
+          const { data } = await supabase.auth.getUser();
+          if (data?.user) {
+            setUser(data.user);
+            if (!data.user.user_metadata?.name) {
+              const { data: userRow } = await supabase
+                .from('users')
+                .select('display_name')
+                .eq('id', data.user.id)
+                .single();
+              if (userRow?.display_name) setDisplayName(userRow.display_name);
+            }
+            // Fetch tickets
+            const { data: tickets, error } = await supabase
+              .from('film_tickets')
+              .select('film_id, expiry_date')
+              .eq('user_id', data.user.id)
+              .eq('is_active', true);
+            if (!error && tickets) {
+              const ticketMap: Record<string, any> = {};
+              tickets.forEach(t => {
+                ticketMap[t.film_id] = t;
+              });
+              setUserTickets(ticketMap);
+            }
+          }
+        })();
+      }
+      if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setDisplayName(null);
+        setUserTickets({});
+      }
+    });
+    return () => {
+      authListener?.subscription.unsubscribe();
+    };
   }, []);
+
+  useEffect(() => {
+    if (confirmLogout) {
+      (async () => {
+        await supabase.auth.signOut();
+        window.location.href = '/';
+      })();
+      setConfirmLogout(false);
+    }
+  }, [confirmLogout]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (profileBtnRef.current && !profileBtnRef.current.contains(e.target as Node)) {
+        setProfileMenuOpen(false);
+      }
+    }
+    if (profileMenuOpen) document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [profileMenuOpen]);
 
   // Now Showing logic
   const nowShowingFilms = allFilms.filter(film =>
@@ -99,22 +196,62 @@ const Home = () => {
           </div>
           <div className="flex items-center space-x-4">
             <span className="text-lg font-semibold bg-gradient-to-r from-tiketx-blue via-tiketx-violet to-tiketx-pink bg-clip-text text-transparent">
-              Welcome, Angeline 👋
+              {(() => {
+                let name = user?.user_metadata?.name;
+                if (!name && displayName) name = displayName;
+                if (!name && user?.email) name = user.email;
+                return `Welcome, ${name || 'Guest'} 👋`;
+              })()}
             </span>
-            <div className="w-10 h-10 bg-tiketx-gradient rounded-full flex items-center justify-center">
-              <User size={20} className="text-white" />
-            </div>
+            {user ? (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <button
+                    className="w-10 h-10 bg-tiketx-gradient rounded-full flex items-center justify-center focus:outline-none"
+                    aria-label="Log out"
+                  >
+                    <LogOut size={22} className="text-white" />
+                  </button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Log out of this account?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to log out of this account?
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => setConfirmLogout(true)}>
+                      Log Out
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            ) : (
+              <>
+                <button
+                  className="w-10 h-10 bg-tiketx-gradient rounded-full flex items-center justify-center focus:outline-none"
+                  aria-label="Login"
+                  onClick={() => setLoginModalOpen(true)}
+                >
+                  <LogIn size={22} className="text-white" />
+                </button>
+                <LoginSignupModal open={loginModalOpen} onOpenChange={setLoginModalOpen} />
+              </>
+            )}
           </div>
         </div>
 
         {/* Hero Banner Slider */}
-        <HeroBannerSlider banners={heroBanners.filter(b => b.enabled)} showMobileOverlay />
+        <HeroBannerSlider banners={heroBanners.filter(b => b.enabled)} userTickets={userTickets} showMobileOverlay />
 
         {/* Content Sections */}
         <SectionRowCarousel title="Now Showing" items={nowShowingFilms} sectionId="now-showing" />
         <SectionRowCarousel title="Action Picks" items={actionPicks} sectionId="action" />
         <SectionRowCarousel title="Short Films" items={shortFilms} sectionId="shorts" />
       </div>
+    {/* No longer need a root-level AlertDialog, handled in dropdown */}
     </div>
   );
 };

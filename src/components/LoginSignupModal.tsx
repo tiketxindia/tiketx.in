@@ -97,6 +97,28 @@ export const LoginSignupModal: React.FC<LoginSignupModalProps> = ({ open, onOpen
     }
   };
 
+  // Google login button (primary)
+  const GoogleButton = () => (
+    <button
+      type="button"
+      className="w-full flex items-center justify-center gap-3 py-3 mb-6 rounded-xl bg-white text-black font-semibold text-base shadow hover:bg-gray-100 transition-colors border border-white/20 max-w-[400px]"
+      onClick={() => handleSocial('google')}
+      disabled={loading}
+    >
+      <span className="w-6 h-6 flex items-center justify-center">
+        <svg width="24" height="24" viewBox="0 0 48 48">
+          <g>
+            <path fill="#4285F4" d="M44.5 20H24v8.5h11.7C34.7 33.1 29.8 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c2.7 0 5.2.9 7.2 2.5l6.4-6.4C34.1 5.1 29.3 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21c10.5 0 20-7.7 20-21 0-1.3-.1-2.7-.3-4z"/>
+            <path fill="#34A853" d="M6.3 14.7l7 5.1C15.5 16.1 19.4 13 24 13c2.7 0 5.2.9 7.2 2.5l6.4-6.4C34.1 5.1 29.3 3 24 3c-7.1 0-13.2 3.7-16.7 9.3z"/>
+            <path fill="#FBBC05" d="M24 45c5.3 0 10.1-1.8 13.8-4.9l-6.4-5.2C29.2 36.9 26.7 37.5 24 37.5c-5.7 0-10.6-3.9-12.3-9.1l-7 5.4C7.1 41.2 14.9 45 24 45z"/>
+            <path fill="#EA4335" d="M44.5 20H24v8.5h11.7c-1.1 3.1-4.1 5.5-7.7 5.5-2.2 0-4.2-.7-5.7-2l-7 5.4C15.5 43.9 19.4 45 24 45c10.5 0 20-7.7 20-21 0-1.3-.1-2.7-.3-4z"/>
+          </g>
+        </svg>
+      </span>
+      Continue with Google
+    </button>
+  );
+
   // Guest logic (disabled for purchase)
   const guestDisabled = !!(redirectPath && redirectPath.startsWith("/movie"));
 
@@ -110,10 +132,14 @@ export const LoginSignupModal: React.FC<LoginSignupModalProps> = ({ open, onOpen
         <div className="flex flex-col items-center pt-12 pb-8 px-8">
           <DialogHeader className="w-full">
             <DialogTitle className="text-2xl font-bold text-white mb-2 text-center">Welcome to TiketX</DialogTitle>
-            <DialogDescription className="text-center text-white/70 mb-6">
+            <DialogDescription className="text-center text-white/70 mb-8">
               {tab === "login" ? "Login to your account" : "Create a new account"}
             </DialogDescription>
           </DialogHeader>
+          {/* Google Login Button */}
+          <div className="mt-3 max-w-[400px] mx-auto w-full">
+            <GoogleButton />
+          </div>
           {/* Tabs */}
           <div className="flex w-full mb-8 rounded-xl bg-white/5 p-1 gap-2">
             <button
@@ -223,37 +249,6 @@ export const LoginSignupModal: React.FC<LoginSignupModalProps> = ({ open, onOpen
               {tab === "login" ? "Login" : "Sign Up"}
             </Button>
           </form>
-          {/* Social login */}
-          <div className="flex items-center my-6 w-full">
-            <div className="flex-1 h-px bg-white/20" />
-            <span className="mx-4 text-white/40 text-sm">or</span>
-            <div className="flex-1 h-px bg-white/20" />
-          </div>
-          <div className="flex w-full gap-3 mb-4">
-            <Button
-              type="button"
-              className="flex-1 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20"
-              onClick={() => handleSocial("google")}
-              disabled={loading}
-            >
-              <SiGoogle className="mr-2" size={18} /> Google
-            </Button>
-            <Button
-              type="button"
-              className="flex-1 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20"
-              onClick={() => handleSocial("apple")}
-              disabled={loading}
-            >
-              <Apple className="mr-2" size={18} /> Apple
-            </Button>
-          </div>
-          <Button
-            type="button"
-            className="w-full py-2 rounded-xl font-semibold text-base bg-gradient-to-r from-gray-700 via-gray-800 to-gray-900 text-white/60 mt-2"
-            disabled={guestDisabled}
-          >
-            Continue as Guest
-          </Button>
         </div>
       </DialogContent>
     </Dialog>

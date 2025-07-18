@@ -14,6 +14,8 @@ import AdminPanel from "./pages/AdminPanel";
 import NotFound from "./pages/NotFound";
 import AdminLogin from "./pages/AdminLogin";
 import MyTikets from "./pages/MyTikets";
+import Search from "./pages/Search";
+import Settings from "./pages/Settings";
 
 const queryClient = new QueryClient();
 
@@ -29,12 +31,14 @@ const App = () => (
               <Routes>
                 <Route path="/admin/login" element={<AdminLogin />} />
                 <Route path="/" element={<Home />} />
+                <Route path="/search" element={<Search />} />
                 <Route path="/watch/:id" element={<Watch />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/admin" element={<AdminPanel />} />
                 <Route path="/movie/:id" element={<MovieDetail />} />
                 <Route path="/my-tikets" element={<MyTikets />} />
+                <Route path="/settings" element={<Settings />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Layout>

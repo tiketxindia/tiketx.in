@@ -5,6 +5,10 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import Hls from 'hls.js';
 
+// Use Vite env variables for Supabase
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
 const Watch = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -15,6 +19,8 @@ const Watch = () => {
   const [loading, setLoading] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [timeLeft, setTimeLeft] = useState(3600); // fallback
+  const [showPrompt, setShowPrompt] = useState(true);
+  const [resumeTime, setResumeTime] = useState(0);
 
   // Fetch film and ticket info
   useEffect(() => {
@@ -110,11 +116,134 @@ const Watch = () => {
     return () => clearInterval(interval);
   }, [ticket]);
 
+  // Resume playback from last saved time
+  useEffect(() => {
+    if (!film || !ticket) return;
+    async function fetchProgress() {
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user) return;
+      const { data } = await supabase
+        .from('user_film_progress')
+        .select('last_time')
+        .eq('user_id', user.id)
+        .eq('film_id', film.id)
+        .eq('ticket_id', ticket.id)
+        .single();
+      if (data && typeof data.last_time === 'number') {
+        setResumeTime(data.last_time);
+        setShowPrompt(true);
+      } else {
+        setResumeTime(0);
+        setShowPrompt(true);
+      }
+    }
+    fetchProgress();
+  }, [film, ticket]);
+
+  // Save progress function
+  const saveProgress = async () => {
+    if (!film || !ticket || !videoRef.current) {
+      console.log('[saveProgress] Missing film, ticket, or videoRef');
+      return;
+    }
+    const user = (await supabase.auth.getUser()).data.user;
+    if (!user) {
+      console.log('[saveProgress] No user');
+      return;
+    }
+    const time = videoRef.current.currentTime;
+    const payload = {
+      user_id: user.id,
+      film_id: film.id,
+      ticket_id: ticket.id,
+      last_time: time,
+    };
+    console.log('[saveProgress] Called', { payload });
+    await supabase
+      .from('user_film_progress')
+      .upsert([payload], { onConflict: 'user_id,film_id,ticket_id' });
+  };
+
+  // Sync every 5 minutes
+  useEffect(() => {
+    if (!film || !ticket) return;
+    const interval = setInterval(saveProgress, 300000);
+    return () => clearInterval(interval);
+  }, [film, ticket]);
+
+  // Sync on key video events and on unmount
+  useEffect(() => {
+    if (!film || !ticket || !videoRef.current || showPrompt) return;
+    const video = videoRef.current;
+    const onPause = () => {
+      console.log('[onPause] Video paused, calling saveProgress');
+      saveProgress();
+    };
+    video.addEventListener('pause', onPause);
+    return () => {
+      video.removeEventListener('pause', onPause);
+    };
+  }, [film, ticket, signedUrl, showPrompt]);
+
+  // Still handle beforeunload and visibilitychange globally
+  useEffect(() => {
+    if (!film || !ticket) return;
+    const onUnload = () => { saveProgress(); };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') saveProgress();
+    };
+    window.addEventListener('beforeunload', onUnload);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      window.removeEventListener('beforeunload', onUnload);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      saveProgress(); // Use upsert on unmount for reliability
+    };
+  }, [film, ticket]);
+
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Robust handlers for resume/start
+  const handleResume = () => {
+    if (videoRef.current) {
+      setShowPrompt(false);
+      const video = videoRef.current;
+      video.muted = true;
+      const onLoadedMetadata = () => {
+        video.currentTime = resumeTime;
+        video.removeEventListener('loadedmetadata', onLoadedMetadata);
+      };
+      video.addEventListener('loadedmetadata', onLoadedMetadata);
+      const playPromise = video.play();
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          setTimeout(() => { video.muted = false; }, 500);
+        }).catch(() => {});
+      }
+    }
+  };
+  const handleStart = () => {
+    if (videoRef.current) {
+      setShowPrompt(false);
+      const video = videoRef.current;
+      video.muted = true;
+      const onLoadedMetadata = () => {
+        video.currentTime = 0;
+        video.removeEventListener('loadedmetadata', onLoadedMetadata);
+      };
+      video.addEventListener('loadedmetadata', onLoadedMetadata);
+      const playPromise = video.play();
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          setTimeout(() => { video.muted = false; }, 500);
+        }).catch(() => {});
+      }
+    }
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-white">Loading...</div>;
@@ -125,7 +254,7 @@ const Watch = () => {
       {/* Header */}
       <div className="flex items-center justify-between p-6">
         <button 
-          onClick={() => navigate(-1)}
+          onClick={async () => { await saveProgress(); navigate(-1); }}
           className="glass-card p-3 rounded-xl hover:bg-white/20 transition-colors"
         >
           <ChevronLeft size={20} />
@@ -136,19 +265,86 @@ const Watch = () => {
         </div>
       </div>
 
-      {/* Video Player */}
+      {/* Video Player or Resume Prompt */}
       <div className="mx-6 mb-6">
-        <div className="relative aspect-video bg-black rounded-2xl overflow-hidden glass-card">
-          {signedUrl ? (
-            <video
-              ref={videoRef}
-              className="absolute inset-0 w-full h-full object-cover object-top"
-              controls
-              autoPlay
-              playsInline
-              style={{ zIndex: 1 }}
-            />
-          ) : (
+        <div className="relative aspect-video bg-black rounded-2xl overflow-hidden glass-card flex items-center justify-center">
+          {signedUrl && (
+            <>
+              <video
+                ref={videoRef}
+                className="absolute inset-0 w-full h-full object-cover object-top"
+                controls
+                autoPlay={false}
+                playsInline
+                style={{ zIndex: 1 }}
+              />
+              {showPrompt && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/80">
+                  {resumeTime > 0 ? (
+                    <div className="flex gap-4">
+                      <button
+                        className="gradient-button text-base font-bold rounded-xl px-6 py-3 flex items-center gap-2"
+                        onClick={() => {
+                          setShowPrompt(false);
+                          if (videoRef.current) {
+                            videoRef.current.currentTime = resumeTime;
+                            videoRef.current.muted = false;
+                            videoRef.current.play();
+                          }
+                        }}
+                      >
+                        <Play className="w-5 h-5" /> Resume Watching
+                      </button>
+                      <button
+                        className="glass-card text-base font-bold rounded-xl px-6 py-3 flex items-center gap-2"
+                        onClick={async () => {
+                          setShowPrompt(false);
+                          if (videoRef.current) {
+                            videoRef.current.currentTime = 0;
+                            videoRef.current.muted = false;
+                            videoRef.current.play();
+                          }
+                          // Save progress as 0 immediately
+                          if (film && ticket) {
+                            const user = (await supabase.auth.getUser()).data.user;
+                            if (user) {
+                              const payload = {
+                                user_id: user.id,
+                                film_id: film.id,
+                                ticket_id: ticket.id,
+                                last_time: 0,
+                              };
+                              await supabase
+                                .from('user_film_progress')
+                                .upsert([payload], { onConflict: 'user_id,film_id,ticket_id' });
+                              console.log('[WatchFromBeginning] Set last_time to 0');
+                            }
+                          }
+                        }}
+                      >
+                        <Play className="w-5 h-5" /> Watch From Beginning
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      className="gradient-button text-base font-bold rounded-xl px-6 py-3 flex items-center gap-2"
+                      onClick={() => {
+                        setShowPrompt(false);
+                        if (videoRef.current) {
+                          videoRef.current.currentTime = 0;
+                          videoRef.current.muted = false;
+                          videoRef.current.play();
+                        }
+                      }}
+                    >
+                      <Play className="w-5 h-5" /> Start Watching
+                    </button>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+          {!signedUrl && (
             <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-tiketx-navy to-tiketx-navy-light">
               <div className="text-center space-y-4">
                 <div className="w-24 h-24 bg-tiketx-gradient rounded-full flex items-center justify-center mx-auto">
