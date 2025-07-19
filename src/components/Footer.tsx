@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 
 const Footer = ({ className = '' }) => {
   return (
@@ -8,7 +9,7 @@ const Footer = ({ className = '' }) => {
         <div>
           <h3 className="text-lg font-semibold mb-3.5 text-white">Company</h3>
           <ul className="space-y-2">
-            <li><a href="#" className="hover:underline">About Us</a></li>
+            <li><Link to="/about" className="hover:underline">About Us</Link></li>
             <li><a href="#" className="hover:underline">Careers</a></li>
           </ul>
           <div className="mt-7 text-xs text-gray-400">© 2025 TiketX. All Rights Reserved.</div>

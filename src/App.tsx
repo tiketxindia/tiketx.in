@@ -16,6 +16,32 @@ import AdminLogin from "./pages/AdminLogin";
 import MyTikets from "./pages/MyTikets";
 import Search from "./pages/Search";
 import Settings from "./pages/Settings";
+import { UserTicketsProvider } from './hooks/useUserTickets';
+import Watchlist from './pages/Watchlist';
+import About from './pages/About';
+import { useEffect, useRef } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+
+function AuthToastListener() {
+  const { toast } = useToast();
+  const isFirstEvent = useRef(true);
+  useEffect(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
+      if (isFirstEvent.current) {
+        isFirstEvent.current = false;
+        return; // Ignore the first event (page load)
+      }
+      if (event === 'SIGNED_IN') {
+        toast({ title: 'Signed in successfully!' });
+      }
+    });
+    return () => {
+      authListener?.subscription.unsubscribe();
+    };
+  }, [toast]);
+  return null;
+}
 
 const queryClient = new QueryClient();
 
@@ -24,27 +50,32 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="*" element={
-            <Layout>
-              <Routes>
-                <Route path="/admin/login" element={<AdminLogin />} />
-                <Route path="/" element={<Home />} />
-                <Route path="/search" element={<Search />} />
-                <Route path="/watch/:id" element={<Watch />} />
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/profile" element={<Profile />} />
-                <Route path="/admin" element={<AdminPanel />} />
-                <Route path="/movie/:id" element={<MovieDetail />} />
-                <Route path="/my-tikets" element={<MyTikets />} />
-                <Route path="/settings" element={<Settings />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Layout>
-          } />
-        </Routes>
-      </BrowserRouter>
+      <AuthToastListener />
+      <UserTicketsProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="*" element={
+              <Layout>
+                <Routes>
+                  <Route path="/admin/login" element={<AdminLogin />} />
+                  <Route path="/" element={<Home />} />
+                  <Route path="/search" element={<Search />} />
+                  <Route path="/watch/:id" element={<Watch />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/profile" element={<Profile />} />
+                  <Route path="/admin" element={<AdminPanel />} />
+                  <Route path="/movie/:id" element={<MovieDetail />} />
+                  <Route path="/my-tikets" element={<MyTikets />} />
+                  <Route path="/settings" element={<Settings />} />
+                  <Route path="/watchlist" element={<Watchlist />} />
+                  <Route path="/about" element={<About />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </Layout>
+            } />
+          </Routes>
+        </BrowserRouter>
+      </UserTicketsProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

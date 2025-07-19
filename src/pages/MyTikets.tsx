@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { CheckCircle2, ArrowLeft, Star, Clock, Play } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import "../styles/ticket-animations.css";
+import { LoginSignupModal } from '@/components/LoginSignupModal';
+import { useState as useReactState } from 'react';
 
 function formatDate(dateStr) {
   const date = new Date(dateStr);
@@ -125,24 +127,27 @@ const TicketCard = ({ ticket }) => {
                 </span>
                 <span className="text-sm md:text-2xl font-extrabold tracking-wider pr-6">₹ {price.toFixed(2)}</span>
               </div>
-              {/* Watch Now and Rate this film buttons for mobile/tab (inside card, bottom right, in a row) */}
-              <div className="flex justify-end mt-4 gap-2">
-                {!isExpired && (
+              {/* Tiket ID and Watch Now row */}
+              <div className="flex flex-row items-center justify-between mt-2">
+                <span className="text-xs font-mono font-bold text-gray-400 select-all">Tiket ID : {ticket.tiket_id}</span>
+                <div className="flex gap-2">
+                  {!isExpired && (
+                    <button
+                      className="flex justify-center items-center gap-2 px-4 py-2 min-w-[140px] h-10 rounded-full bg-gradient-to-br from-[#23243a] via-[#2d193c] to-[#3a2323] text-white font-semibold text-sm md:text-base shadow-md hover:opacity-90 active:opacity-80 transition-all focus:outline-none focus:ring-2 focus:ring-tiketx-blue/50 whitespace-nowrap"
+                      onClick={() => alert(`Watch now: ${film?.title}`)}
+                    >
+                      <Play className="w-4 h-4 text-white" />
+                      Watch Now
+                    </button>
+                  )}
                   <button
-                    className="flex justify-center items-center gap-2 px-4 py-2 min-w-[140px] h-10 rounded-full bg-gradient-to-br from-[#23243a] via-[#2d193c] to-[#3a2323] text-white font-semibold text-sm md:text-base shadow-md hover:opacity-90 active:opacity-80 transition-all focus:outline-none focus:ring-2 focus:ring-tiketx-blue/50 whitespace-nowrap"
-                    onClick={() => alert(`Watch now: ${film?.title}`)}
+                    className="flex justify-center items-center gap-2 px-4 py-2 min-w-[140px] h-10 rounded-full bg-[#23232a] text-white font-semibold text-sm md:text-base shadow-md hover:bg-[#18181b] active:bg-black transition-colors focus:outline-none focus:ring-2 focus:ring-tiketx-blue/50 whitespace-nowrap"
+                    onClick={() => alert(`Rate this film: ${film?.title}`)}
                   >
-                    <Play className="w-4 h-4 text-white" />
-                    Watch Now
+                    <Star className="w-4 h-4 text-white" />
+                    Rate this film
                   </button>
-                )}
-                <button
-                  className="flex justify-center items-center gap-2 px-4 py-2 min-w-[140px] h-10 rounded-full bg-[#23232a] text-white font-semibold text-sm md:text-base shadow-md hover:bg-[#18181b] active:bg-black transition-colors focus:outline-none focus:ring-2 focus:ring-tiketx-blue/50 whitespace-nowrap"
-                  onClick={() => alert(`Rate this film: ${film?.title}`)}
-                >
-                  <Star className="w-4 h-4 text-white" />
-                  Rate this film
-                </button>
+                </div>
               </div>
             </div>
           </div>
@@ -155,21 +160,24 @@ const TicketCard = ({ ticket }) => {
 const MyTikets = () => {
   const [tickets, setTickets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
+  const [loginModalOpen, setLoginModalOpen] = useReactState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     async function fetchTickets() {
       setLoading(true);
-      const user = (await supabase.auth.getUser()).data.user;
-      if (!user) {
+      const userObj = (await supabase.auth.getUser()).data.user;
+      setUser(userObj);
+      if (!userObj) {
         setTickets([]);
         setLoading(false);
         return;
       }
       const { data, error } = await supabase
         .from('film_tickets')
-        .select('id, film_id, purchase_date, expiry_date, is_active, price, films:film_id(id, title, film_thumbnail_vertical, runtime, language, release_year, genres)')
-        .eq('user_id', user.id)
+        .select('id, film_id, purchase_date, expiry_date, is_active, price, films:film_id(id, title, film_thumbnail_vertical, runtime, language, release_year, genres), tiket_id')
+        .eq('user_id', userObj.id)
         .order('purchase_date', { ascending: false });
       if (!error && data) {
         setTickets(data);
@@ -182,7 +190,7 @@ const MyTikets = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-black py-10 px-4 md:px-8">
+    <div className="min-h-screen bg-black py-10 px-4 md:px-8 flex flex-col">
       <div className="w-full">
         <div className="flex items-center mb-8 w-full">
           <button
@@ -193,22 +201,35 @@ const MyTikets = () => {
           >
             <ArrowLeft className="w-6 h-6 text-white" />
           </button>
-          <div className="flex-1 flex justify-center">
-            <h2 className="text-2xl font-bold text-white text-center">My Tikets</h2>
+          <div className="flex-1 flex justify-start pl-8">
+            <h2 className="text-2xl font-bold text-white">My Tikets</h2>
           </div>
         </div>
-        {loading ? (
-          <div className="text-center text-gray-400 py-16">Loading...</div>
-        ) : tickets.length === 0 ? (
-          <div className="text-center text-gray-500 py-16">No tickets found.</div>
-        ) : (
-          <div className="flex flex-col items-center w-full">
-            {tickets.map((ticket) => (
-              ticket.films ? <div className="w-[1020px] max-w-full"><TicketCard key={ticket.id} ticket={ticket} /></div> : null
-            ))}
-          </div>
-        )}
       </div>
+      {loading ? (
+        <div className="flex items-center justify-center min-h-[200px] text-lg font-semibold animate-pulse">Loading...</div>
+      ) : !user ? (
+        <div className="flex flex-1 flex-col items-center justify-center min-h-[300px]">
+          <div className="text-lg text-gray-300 mb-6">Sign in to view your tickets</div>
+          <button
+            className="gradient-button px-8 py-4 rounded-xl font-bold text-lg shadow-lg hover:scale-105 transition-transform"
+            onClick={() => setLoginModalOpen(true)}
+          >
+            Login
+          </button>
+          <LoginSignupModal open={loginModalOpen} onOpenChange={setLoginModalOpen} />
+        </div>
+      ) : tickets.length === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center min-h-[300px]">
+          <div className="text-lg text-gray-400">No tickets found.</div>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-8 items-center">
+          {tickets.map(ticket => (
+            <TicketCard key={ticket.id} ticket={ticket} />
+          ))}
+        </div>
+      )}
     </div>
   );
 };

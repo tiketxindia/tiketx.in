@@ -22,73 +22,16 @@ interface LoginSignupModalProps {
 }
 
 export const LoginSignupModal: React.FC<LoginSignupModalProps> = ({ open, onOpenChange, redirectPath }) => {
-  const [tab, setTab] = useState<'login' | 'signup'>("login");
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-    profilePic: undefined as File | undefined,
-  });
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Handle input changes
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, files } = e.target;
-    if (name === "profilePic" && files) {
-      setForm((f) => ({ ...f, profilePic: files[0] }));
-    } else {
-      setForm((f) => ({ ...f, [name]: value }));
-    }
-  };
-
-  // Handle login/signup submit
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    try {
-      if (tab === "login") {
-        const { error } = await supabase.auth.signInWithPassword({
-          email: form.email,
-          password: form.password,
-        });
-        if (error) throw error;
-        toast({ title: "Login successful!", variant: "default" });
-        onOpenChange(false);
-        // Redirect logic here (e.g., window.location or router)
-      } else {
-        if (form.password !== form.confirmPassword) {
-          setError("Passwords do not match");
-          setLoading(false);
-          return;
-        }
-        const { error } = await supabase.auth.signUp({
-          email: form.email,
-          password: form.password,
-          options: { data: { name: form.name } },
-        });
-        if (error) throw error;
-        toast({ title: "Signup successful!", variant: "default" });
-        onOpenChange(false);
-        // Redirect logic here
-      }
-    } catch (err: any) {
-      setError(err.message || "Something went wrong");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Social login handlers (Google/Apple)
-  const handleSocial = async (provider: "google" | "apple") => {
+  // Social login handler (Google only)
+  const handleSocial = async () => {
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithOAuth({ provider });
+      const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
       if (error) throw error;
-      toast({ title: `Signed in with ${provider}` });
       onOpenChange(false);
     } catch (err: any) {
       setError(err.message || "Social login failed");
@@ -102,7 +45,7 @@ export const LoginSignupModal: React.FC<LoginSignupModalProps> = ({ open, onOpen
     <button
       type="button"
       className="w-full flex items-center justify-center gap-3 py-3 mb-6 rounded-xl bg-white text-black font-semibold text-base shadow hover:bg-gray-100 transition-colors border border-white/20 max-w-[400px]"
-      onClick={() => handleSocial('google')}
+      onClick={handleSocial}
       disabled={loading}
     >
       <span className="w-6 h-6 flex items-center justify-center">
@@ -119,9 +62,6 @@ export const LoginSignupModal: React.FC<LoginSignupModalProps> = ({ open, onOpen
     </button>
   );
 
-  // Guest logic (disabled for purchase)
-  const guestDisabled = !!(redirectPath && redirectPath.startsWith("/movie"));
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="backdrop-blur-xl bg-black/80 border-none shadow-2xl max-w-md rounded-2xl p-0 overflow-hidden">
@@ -133,122 +73,14 @@ export const LoginSignupModal: React.FC<LoginSignupModalProps> = ({ open, onOpen
           <DialogHeader className="w-full">
             <DialogTitle className="text-2xl font-bold text-white mb-2 text-center">Welcome to TiketX</DialogTitle>
             <DialogDescription className="text-center text-white/70 mb-8">
-              {tab === "login" ? "Login to your account" : "Create a new account"}
+              Login or sign up with Google to continue
             </DialogDescription>
           </DialogHeader>
           {/* Google Login Button */}
           <div className="mt-3 max-w-[400px] mx-auto w-full">
             <GoogleButton />
           </div>
-          {/* Tabs */}
-          <div className="flex w-full mb-8 rounded-xl bg-white/5 p-1 gap-2">
-            <button
-              className={`flex-1 py-2 rounded-xl font-semibold transition-all text-base ${tab === "login" ? "bg-gradient-to-r from-tiketx-pink via-tiketx-violet to-tiketx-blue text-white shadow-lg" : "text-white/60 hover:text-white"}`}
-              onClick={() => setTab("login")}
-              disabled={tab === "login"}
-            >
-              Login
-            </button>
-            <button
-              className={`flex-1 py-2 rounded-xl font-semibold transition-all text-base ${tab === "signup" ? "bg-gradient-to-r from-tiketx-pink via-tiketx-violet to-tiketx-blue text-white shadow-lg" : "text-white/60 hover:text-white"}`}
-              onClick={() => setTab("signup")}
-              disabled={tab === "signup"}
-            >
-              Sign Up
-            </button>
-          </div>
-          {/* Form */}
-          <form className="w-full space-y-5" onSubmit={handleSubmit}>
-            {tab === "signup" && (
-              <div className="relative">
-                <Input
-                  name="name"
-                  type="text"
-                  placeholder="Name"
-                  value={form.name}
-                  onChange={handleChange}
-                  className="pl-10 bg-black/60 border-tiketx-pink/40 text-white rounded-xl"
-                  required
-                />
-                <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-tiketx-pink" size={20} />
-              </div>
-            )}
-            <div className="relative">
-              <Input
-                name="email"
-                type="email"
-                placeholder="Email"
-                value={form.email}
-                onChange={handleChange}
-                className="pl-10 bg-black/60 border-tiketx-blue/40 text-white rounded-xl"
-                required
-              />
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-tiketx-blue" size={20} />
-            </div>
-            <div className="relative">
-              <Input
-                name="password"
-                type="password"
-                placeholder="Password"
-                value={form.password}
-                onChange={handleChange}
-                className="pl-10 bg-black/60 border-tiketx-violet/40 text-white rounded-xl"
-                required
-              />
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-tiketx-violet" size={20} />
-            </div>
-            {tab === "signup" && (
-              <div className="relative">
-                <Input
-                  name="confirmPassword"
-                  type="password"
-                  placeholder="Confirm Password"
-                  value={form.confirmPassword}
-                  onChange={handleChange}
-                  className="pl-10 bg-black/60 border-tiketx-violet/40 text-white rounded-xl"
-                  required
-                />
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-tiketx-violet" size={20} />
-              </div>
-            )}
-            {tab === "signup" && (
-              <div className="relative flex items-center gap-3">
-                <label htmlFor="profilePic" className="flex items-center cursor-pointer">
-                  <Avatar className="w-10 h-10 mr-2">
-                    {form.profilePic ? (
-                      <AvatarImage src={URL.createObjectURL(form.profilePic)} />
-                    ) : (
-                      <AvatarFallback>
-                        <ImageIcon className="text-tiketx-blue" />
-                      </AvatarFallback>
-                    )}
-                  </Avatar>
-                  <span className="text-sm text-white/70">Upload Profile Picture</span>
-                  <Input
-                    id="profilePic"
-                    name="profilePic"
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleChange}
-                  />
-                </label>
-              </div>
-            )}
-            {tab === "login" && (
-              <div className="flex justify-end">
-                <button type="button" className="text-tiketx-blue text-sm hover:underline">Forgot Password?</button>
-              </div>
-            )}
-            {error && <div className="text-red-400 text-sm text-center">{error}</div>}
-            <Button
-              type="submit"
-              className="w-full py-3 rounded-xl font-bold text-lg bg-gradient-to-r from-tiketx-pink via-tiketx-violet to-tiketx-blue text-white shadow-lg"
-              disabled={loading}
-            >
-              {tab === "login" ? "Login" : "Sign Up"}
-            </Button>
-          </form>
+          {error && <div className="text-red-400 text-sm text-center mt-4">{error}</div>}
         </div>
       </DialogContent>
     </Dialog>

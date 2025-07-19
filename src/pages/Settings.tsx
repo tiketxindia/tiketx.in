@@ -1,6 +1,9 @@
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { LogOut, Save, User as UserIcon, Mail, Image as ImageIcon, Key } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { useState as useReactState } from 'react';
+import { LoginSignupModal } from '@/components/LoginSignupModal';
 
 const Settings = () => {
   const [user, setUser] = useState<any>(null);
@@ -9,18 +12,26 @@ const Settings = () => {
   const [profilePic, setProfilePic] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [nickname, setNickname] = useState('');
+  const [useNickname, setUseNickname] = useState(false);
+  const [loginModalOpen, setLoginModalOpen] = useReactState(false);
 
   useEffect(() => {
+    setInitialLoading(true);
     supabase.auth.getUser().then(({ data }) => {
       if (data?.user) {
         setUser(data.user);
         setName(data.user.user_metadata?.name || '');
         setEmail(data.user.email || '');
         setProfilePic(data.user.user_metadata?.avatar_url || null);
+        setNickname(data.user.user_metadata?.nickname || '');
+        setUseNickname(!!data.user.user_metadata?.use_nickname);
       }
+      setInitialLoading(false);
     });
   }, []);
 
@@ -50,35 +61,14 @@ const Settings = () => {
     setLoading(true);
     setError('');
     setSuccess('');
-    // Update name in auth
-    const { error: metaError } = await supabase.auth.updateUser({ data: { name } });
+    // Update name, nickname, and use_nickname in auth (user_metadata)
+    const { error: metaError } = await supabase.auth.updateUser({ data: { name, nickname, use_nickname: useNickname } });
     if (metaError) {
-      setError('Failed to update name');
+      setError('Failed to update profile');
       setLoading(false);
       return;
     }
-    // Update name in users table
-    if (user?.id) {
-      const { error: dbError } = await supabase
-        .from('users')
-        .upsert({ id: user.id, display_name: name, email: user.email });
-      if (dbError) {
-        setError('Failed to update display name in users table');
-        setLoading(false);
-        return;
-      }
-    }
-    // Update password if provided
-    if (newPassword) {
-      const { error: passError } = await supabase.auth.updateUser({ password: newPassword });
-      if (passError) {
-        setError('Failed to update password');
-        setLoading(false);
-        return;
-      }
-    }
     setSuccess('Profile updated!');
-    setNewPassword('');
     setLoading(false);
   };
 
@@ -86,6 +76,28 @@ const Settings = () => {
     await supabase.auth.signOut();
     window.location.href = '/';
   };
+
+  if (initialLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-black text-white">
+        <div className="text-lg font-semibold animate-pulse">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-black text-white">
+        <button
+          className="gradient-button px-8 py-4 rounded-xl font-bold text-lg shadow-lg hover:scale-105 transition-transform"
+          onClick={() => setLoginModalOpen(true)}
+        >
+          Login
+        </button>
+        <LoginSignupModal open={loginModalOpen} onOpenChange={setLoginModalOpen} />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black text-white flex flex-col items-center py-12 px-4">
@@ -98,52 +110,39 @@ const Settings = () => {
               alt="Profile"
               className="w-28 h-28 rounded-full object-cover border-4 border-tiketx-blue shadow-lg"
             />
-            <button
-              className="absolute bottom-2 right-2 bg-tiketx-blue p-2 rounded-full hover:bg-tiketx-pink transition-colors"
-              onClick={() => fileInputRef.current?.click()}
-              type="button"
-            >
-              <ImageIcon className="w-5 h-5 text-white" />
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleProfilePicChange}
-            />
           </div>
-          <div className="text-lg font-semibold mt-1">{name || 'User'}</div>
+          <div className="text-lg font-semibold mt-1">{useNickname && nickname ? nickname : name || 'User'}</div>
           <div className="text-gray-400 text-sm flex items-center gap-1"><Mail className="w-4 h-4" /> {email}</div>
         </div>
         <div className="w-full flex flex-col gap-6">
           <div>
             <label className="block text-sm text-gray-400 mb-1">Name</label>
             <input
-              className="w-full bg-black/60 border border-white/20 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-tiketx-blue"
+              className="w-full bg-gray-800 border border-white/20 rounded-lg px-4 py-3 text-gray-400 placeholder-gray-500 focus:outline-none cursor-not-allowed"
               value={name}
-              onChange={e => setName(e.target.value)}
-              placeholder="Your name"
-              disabled={loading}
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">Email</label>
-            <input
-              className="w-full bg-black/60 border border-white/20 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-tiketx-blue"
-              value={email}
               disabled
             />
           </div>
           <div>
-            <label className="block text-sm text-gray-400 mb-1">New Password</label>
+            <label className="block text-sm text-gray-400 mb-1">Nickname</label>
             <input
               className="w-full bg-black/60 border border-white/20 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-tiketx-blue"
-              value={newPassword}
-              onChange={e => setNewPassword(e.target.value)}
-              placeholder="Change password"
-              type="password"
+              value={nickname}
+              onChange={e => setNickname(e.target.value)}
+              placeholder="Enter a nickname"
               disabled={loading}
+            />
+          </div>
+          <div className="flex items-center gap-3">
+            <Switch id="use-nickname" checked={useNickname} onCheckedChange={setUseNickname} />
+            <label htmlFor="use-nickname" className="text-sm text-gray-400 select-none">Use Nickname as display name</label>
+          </div>
+          <div>
+            <label className="block text-sm text-gray-400 mb-1">Email</label>
+            <input
+              className="w-full bg-gray-800 border border-white/20 rounded-lg px-4 py-3 text-gray-400 placeholder-gray-500 focus:outline-none cursor-not-allowed"
+              value={email}
+              disabled
             />
           </div>
         </div>

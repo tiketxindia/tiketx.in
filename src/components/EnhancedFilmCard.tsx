@@ -4,7 +4,11 @@ import { Play, Plus, Star, Clock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { formatDistanceStrict } from 'date-fns';
-import { IoTicket } from 'react-icons/io5';
+import { IoTicket, IoTicketOutline } from 'react-icons/io5';
+import { BsThreeDotsVertical, BsBookmarkPlusFill, BsBookmarkCheckFill } from 'react-icons/bs';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { CheckCircle } from 'lucide-react';
 
 interface EnhancedFilmCardProps {
   id: number;
@@ -54,6 +58,84 @@ export const EnhancedFilmCard = ({
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [overlayReady, setOverlayReady] = useState(false);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [inWatchlist, setInWatchlist] = useState(isInWatchlist);
+  const [watchlistLoading, setWatchlistLoading] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
+
+  // Fetch initial watchlist state for this film and user
+  useEffect(() => {
+    (async () => {
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user) return;
+      const { data, error } = await supabase
+        .from('user_watchlist')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('film_id', id)
+        .single();
+      setInWatchlist(!!data && !error);
+    })();
+    // eslint-disable-next-line
+  }, [id]);
+
+  // Add/remove from watchlist
+  const handleWatchlistToggle = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setWatchlistLoading(true);
+    const user = (await supabase.auth.getUser()).data.user;
+    if (!user) {
+      setWatchlistLoading(false);
+      setMenuOpen(false);
+      // Optionally, show login modal here
+      return;
+    }
+    if (inWatchlist) {
+      // Remove from watchlist
+      await supabase
+        .from('user_watchlist')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('film_id', id);
+      setInWatchlist(false);
+      toast({
+        title: (
+          <span className="flex items-center gap-2">
+            <CheckCircle className="w-5 h-5 text-green-500" />
+            Removed from Watchlist
+          </span>
+        ),
+      });
+    } else {
+      // Add to watchlist
+      await supabase
+        .from('user_watchlist')
+        .insert({ user_id: user.id, film_id: id });
+      setInWatchlist(true);
+      toast({
+        title: (
+          <span className="flex items-center gap-2">
+            <CheckCircle className="w-5 h-5 text-green-500" />
+            Added to Watchlist
+          </span>
+        ),
+      });
+    }
+    setWatchlistLoading(false);
+    setMenuOpen(false);
+  };
+
+  // Close menu on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    if (menuOpen) document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [menuOpen]);
 
   const isTicketActive = hasTicket && ticketExpiry && new Date(ticketExpiry) > new Date();
 
@@ -121,6 +203,31 @@ export const EnhancedFilmCard = ({
         transition: 'transform 0.3s cubic-bezier(0.4,0,0.2,1), box-shadow 0.3s cubic-bezier(0.4,0,0.2,1)',
       }}
     >
+      {/* 3-dot menu */}
+      <div className="absolute top-3 right-3 z-40" ref={menuRef} onClick={e => e.stopPropagation()}>
+        <button
+          className="bg-black/60 hover:bg-black/80 rounded-full p-1.5 flex items-center justify-center focus:outline-none"
+          onClick={e => { e.stopPropagation(); setMenuOpen(m => !m); }}
+        >
+          <BsThreeDotsVertical className="w-4 h-4 text-white" />
+        </button>
+        {menuOpen && (
+          <div className="absolute right-0 mt-2 w-48 bg-black/95 border border-white/10 rounded-xl shadow-lg py-2 z-50 animate-fade-in">
+            <button
+              className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white hover:bg-white/10 transition-colors disabled:opacity-60"
+              onClick={handleWatchlistToggle}
+              disabled={watchlistLoading}
+            >
+              {inWatchlist ? (
+                <BsBookmarkCheckFill className="w-5 h-5 text-green-400" />
+              ) : (
+                <BsBookmarkPlusFill className="w-5 h-5 text-white" />
+              )}
+              {watchlistLoading ? 'Please wait...' : inWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
+            </button>
+          </div>
+        )}
+      </div>
       {/* Ribbon Badge */}
       {isTicketActive && (
         <div className="absolute top-3 left-3 z-30">
@@ -186,7 +293,7 @@ export const EnhancedFilmCard = ({
         {/* Buy Ticket Button absolutely centered on the tear line, only on hover and if not ticket active */}
         {!isTicketActive && isHovered && (
           <button
-            className="gradient-button px-8 py-3 rounded-xl text-base font-bold shadow-lg absolute left-1/2"
+            className="gradient-button px-8 py-3 rounded-xl text-base font-bold shadow-lg absolute left-1/2 whitespace-nowrap text-center flex items-center justify-center gap-2"
             style={{
               top: '50%',
               transform: 'translate(-50%, -50%)',
@@ -198,7 +305,8 @@ export const EnhancedFilmCard = ({
               navigate(`/movie/${id}`);
             }}
           >
-            Buy Ticket
+            <IoTicketOutline className="w-6 h-6" />
+            Buy Tiket
           </button>
         )}
       </div>

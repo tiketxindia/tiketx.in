@@ -2,17 +2,21 @@ import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { EnhancedFilmCard } from '@/components/EnhancedFilmCard';
 import { Mic, MicOff, Search as SearchIcon } from 'lucide-react';
+import { useUserTickets } from '@/hooks/useUserTickets';
 
 const Search = () => {
   const [films, setFilms] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isListening, setIsListening] = useState(false);
+  const [filmsLoading, setFilmsLoading] = useState(true);
   const recognitionRef = useRef<any>(null);
+  const { userTickets, loading: ticketsLoading } = useUserTickets();
 
   useEffect(() => {
-    // Fetch all films on mount
+    setFilmsLoading(true);
     supabase.from('films').select('*').then(({ data, error }) => {
       if (!error && data) setFilms(data);
+      setFilmsLoading(false);
     });
   }, []);
 
@@ -56,6 +60,15 @@ const Search = () => {
     );
   });
 
+  const isLoading = filmsLoading || ticketsLoading;
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-black text-white">
+        <div className="text-lg font-semibold animate-pulse">Loading...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-black text-white px-0 md:px-8 py-8">
       <div className="max-w-3xl mx-auto w-full">
@@ -84,25 +97,29 @@ const Search = () => {
           {filteredFilms.length === 0 && (
             <div className="col-span-full text-center text-gray-400 text-lg py-16">No films found.</div>
           )}
-          {filteredFilms.map(film => (
-            <EnhancedFilmCard
-              key={film.id}
-              id={film.id}
-              title={film.title}
-              poster={film.film_thumbnail_vertical || film.film_thumbnail_horizontal}
-              hoverPoster={film.film_thumbnail_horizontal}
-              genre={Array.isArray(film.genres) ? film.genres[0] : (film.genre || '')}
-              duration={film.runtime ? `${film.runtime} min` : ''}
-              year={film.release_year}
-              certificate={film.certificate}
-              language={film.language}
-              description={film.synopsis}
-              hasTicket={film.has_ticket}
-              ticketExpiry={film.film_expiry_date}
-              type={film.type}
-              ticket_price={film.ticket_price}
-            />
-          ))}
+          {filteredFilms.map(film => {
+            const userTicket = userTickets[film.id];
+            const ticketExpiry = userTicket && userTicket.expiry_date ? userTicket.expiry_date : null;
+            return (
+              <EnhancedFilmCard
+                key={film.id}
+                id={film.id}
+                title={film.title}
+                poster={film.film_thumbnail_vertical || film.film_thumbnail_horizontal}
+                hoverPoster={film.film_thumbnail_horizontal}
+                genre={Array.isArray(film.genres) ? film.genres[0] : (film.genre || '')}
+                duration={film.runtime ? `${film.runtime} min` : ''}
+                year={film.release_year}
+                certificate={film.certificate}
+                language={film.language}
+                description={film.synopsis}
+                hasTicket={!!userTicket && ticketExpiry && new Date(ticketExpiry) > new Date()}
+                ticketExpiry={ticketExpiry}
+                type={film.type}
+                ticket_price={film.ticket_price}
+              />
+            );
+          })}
         </div>
       </div>
     </div>

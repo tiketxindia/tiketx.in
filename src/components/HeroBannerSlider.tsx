@@ -8,6 +8,7 @@ import { LoginSignupModal } from "./LoginSignupModal";
 import { supabase } from "@/integrations/supabase/client";
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import Hls from 'hls.js';
+import { useUserTickets } from '@/hooks/useUserTickets';
 
 interface HeroBanner {
   id: string;
@@ -32,11 +33,10 @@ interface HeroBanner {
 
 interface HeroBannerSliderProps {
   banners: HeroBanner[];
-  userTickets: Record<string, any>;
   showMobileOverlay?: boolean;
 }
 
-export const HeroBannerSlider = ({ banners, userTickets, showMobileOverlay }: HeroBannerSliderProps) => {
+export const HeroBannerSlider = ({ banners, showMobileOverlay }: HeroBannerSliderProps) => {
   // All hooks at the very top
   const [currentSlide, setCurrentSlide] = useState(0);
   const navigate = useNavigate();
@@ -51,6 +51,7 @@ export const HeroBannerSlider = ({ banners, userTickets, showMobileOverlay }: He
   const currentBanner = banners[currentSlide];
   // Get filmId from banner (may be string or number)
   const filmid = currentBanner?.filmid;
+  const { userTickets } = useUserTickets();
   const hasTicket = filmid && userTickets && userTickets[filmid];
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [loginRedirectPath, setLoginRedirectPath] = useState<string | null>(null);

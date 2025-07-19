@@ -9,6 +9,9 @@ import YouTube from 'react-youtube';
 import { Pause } from 'lucide-react';
 import { openRazorpayModal } from '@/lib/razorpay';
 import { format } from 'date-fns';
+import Confetti from 'react-confetti';
+import { useUserTickets } from '@/hooks/useUserTickets';
+import { LoginSignupModal } from '@/components/LoginSignupModal';
 
 const MovieDetail = () => {
   const { id } = useParams();
@@ -22,6 +25,10 @@ const MovieDetail = () => {
   const [crew, setCrew] = useState<any[]>([]);
   const [hasTicket, setHasTicket] = useState(false);
   const [ticketExpiry, setTicketExpiry] = useState<string | null>(null);
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const { refreshTickets } = useUserTickets();
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
 
   // Check for valid ticket on mount and after purchase
   useEffect(() => {
@@ -132,6 +139,45 @@ const MovieDetail = () => {
     if (event.data === 2) setTrailerIsPlaying(false); // paused
   }
 
+  // Add the keyframes for flip-in animation at the top of the file (or inject via a <style> tag if needed)
+  if (typeof window !== 'undefined' && !document.getElementById('tiket-flip-in-keyframes')) {
+    const style = document.createElement('style');
+    style.id = 'tiket-flip-in-keyframes';
+    style.innerHTML = `
+      @keyframes tiket-flip-in {
+        0% {
+          transform: perspective(800px) rotateY(90deg) scale(0.8);
+          opacity: 0;
+        }
+        60% {
+          transform: perspective(800px) rotateY(-10deg) scale(1.05);
+          opacity: 1;
+        }
+        80% {
+          transform: perspective(800px) rotateY(5deg) scale(0.98);
+        }
+        100% {
+          transform: perspective(800px) rotateY(0deg) scale(1);
+          opacity: 1;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  // Helper to generate a unique tiket_id
+  async function generateUniqueTiketId() {
+    let unique = false;
+    let tiketId = '';
+    while (!unique) {
+      const randomNum = Math.floor(100000 + Math.random() * 900000); // 6 digits
+      tiketId = `MYTIKET${randomNum}`;
+      const { data } = await supabase.from('film_tickets').select('id').eq('tiket_id', tiketId).single();
+      if (!data) unique = true;
+    }
+    return tiketId;
+  }
+
   return (
     <div className="min-h-screen">
       {/* Header */}
@@ -151,12 +197,26 @@ const MovieDetail = () => {
       {/* Hero Banner / Trailer */}
       <div className="relative mb-6">
         <div className="h-[300px] md:h-[400px] relative overflow-hidden rounded-2xl mx-6 group">
+          {/* Background Image */}
+          <img
+            src={film.film_thumbnail_horizontal}
+            alt={film.title}
+            className="w-full h-full object-cover"
+          />
+          {/* Dark overlay for dimming */}
+          <div className="absolute inset-0 bg-black" style={{ opacity: 0.7 }} />
+          {/* Watch Trailer Button */}
           {!playingTrailer || !trailerId ? (
-            <img
-              src={film.film_thumbnail_horizontal}
-              alt={film.title}
-              className="w-full h-full object-cover"
-            />
+            <button
+              className="absolute inset-0 flex items-center justify-center"
+              style={{ zIndex: 2 }}
+              onClick={() => { setPlayingTrailer(true); setTrailerIsPlaying(true); }}
+            >
+              <span className="gradient-button flex items-center space-x-2 text-lg px-8 py-4 font-bold rounded-xl">
+                <Play size={24} />
+                Watch Trailer
+              </span>
+            </button>
           ) : (
             <div className="w-full h-full relative">
               <YouTube
@@ -174,15 +234,6 @@ const MovieDetail = () => {
                 style={{ outline: 'none' }}
               >
                 {trailerIsPlaying ? <Pause size={28} /> : <Play size={28} />}
-              </button>
-            </div>
-          )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
-          {!playingTrailer && trailerId && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <button className="gradient-button flex items-center space-x-2 text-lg" onClick={() => { setPlayingTrailer(true); setTrailerIsPlaying(true); }}>
-                <Play size={24} />
-                <span>Watch Trailer</span>
               </button>
             </div>
           )}
@@ -266,7 +317,11 @@ const MovieDetail = () => {
                 <div className="flex flex-col items-center justify-end h-full relative group min-w-[260px]">
                   <button
                     className="gradient-button text-base font-bold rounded-xl mt-2 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed w-full min-w-[220px] max-w-full px-6 py-2"
-                    onClick={() => navigate(`/watch/${film.id}`)}
+                    onClick={async () => {
+                      const user = (await supabase.auth.getUser()).data.user;
+                      if (!user) { setLoginModalOpen(true); return; }
+                      navigate(`/watch/${film.id}`);
+                    }}
                     disabled={!hasTicket}
                   >
                     <Play size={20} />
@@ -346,6 +401,11 @@ const MovieDetail = () => {
                 className="gradient-button text-base px-6 py-3 font-bold rounded-2xl mx-4"
                 onClick={async () => {
                   // Open Razorpay modal for ticket purchase
+                  const user = (await supabase.auth.getUser()).data.user;
+                  if (!user) {
+                    setLoginModalOpen(true);
+                    return;
+                  }
                   openRazorpayModal({
                     amount: film.ticket_price * 100, // Razorpay expects paise
                     name: film.title,
@@ -353,13 +413,9 @@ const MovieDetail = () => {
                     order_id: undefined, // Optionally pass order_id from backend
                     onSuccess: async (response) => {
                       // On payment success, deactivate previous tickets and insert new one
-                      const user = (await supabase.auth.getUser()).data.user;
-                      if (!user) {
-                        alert('You must be logged in to buy a ticket.');
-                        return;
-                      }
                       const purchaseDate = new Date();
                       const expiryDate = new Date(purchaseDate.getTime() + 24 * 60 * 60 * 1000); // 24 hours from now
+                      const tiketId = await generateUniqueTiketId();
                       // 1. Set is_active=false for all previous tickets for this user and film
                       await supabase.from('film_tickets')
                         .update({ is_active: false })
@@ -374,13 +430,17 @@ const MovieDetail = () => {
                         expiry_date: expiryDate.toISOString(),
                         price: film.ticket_price,
                         is_active: true,
+                        tiket_id: tiketId,
                       });
                       if (error) {
                         alert('Failed to save ticket: ' + error.message);
                       } else {
-                        alert('Payment successful! Ticket saved. Payment ID: ' + response.razorpay_payment_id);
-                        setHasTicket(true); // Immediately enable Watch Now
-                        setTicketExpiry(expiryDate.toISOString()); // Set expiry date in state
+                        setHasTicket(true);
+                        setTicketExpiry(expiryDate.toISOString());
+                        setShowCelebration(true);
+                        setShowConfetti(true);
+                        setTimeout(() => setShowConfetti(false), 60000);
+                        refreshTickets();
                       }
                     },
                     onFailure: (reason) => {
@@ -401,6 +461,124 @@ const MovieDetail = () => {
           </div>
         </div>
       )}
+      {showCelebration && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80">
+          {showConfetti && <Confetti width={window.innerWidth} height={window.innerHeight} recycle={true} numberOfPieces={300} />}
+          <div
+            className="relative flex flex-row items-stretch bg-[#f5f5f7] mx-2 overflow-visible"
+            style={{
+              borderRadius: '18px',
+              minWidth: 500,
+              maxWidth: 600,
+              height: 260,
+              position: 'relative',
+              alignItems: 'stretch',
+              boxShadow: 'none',
+              gap: 12,
+              animation: 'tiket-flip-in 0.7s cubic-bezier(.68,-0.55,.27,1.55) both',
+            }}
+          >
+            {/* Notch left - center vertically, black */}
+            <div style={{
+              position: 'absolute', left: -24, top: '50%', transform: 'translateY(-50%)', width: 48, height: 48, zIndex: 10, overflow: 'hidden', pointerEvents: 'none',
+            }}>
+              <svg width="48" height="48" style={{ position: 'absolute', left: 0, top: 0 }}><circle cx="24" cy="24" r="24" fill="#000" /></svg>
+            </div>
+            {/* Notch right - center vertically, black */}
+            <div style={{
+              position: 'absolute', right: -24, top: '50%', transform: 'translateY(-50%)', width: 48, height: 48, zIndex: 10, overflow: 'hidden', pointerEvents: 'none',
+            }}>
+              <svg width="48" height="48" style={{ position: 'absolute', left: 0, top: 0 }}><circle cx="24" cy="24" r="24" fill="#000" /></svg>
+            </div>
+            {/* Left: Poster */}
+            <div
+              style={{
+                borderTopLeftRadius: 18,
+                borderBottomLeftRadius: 18,
+                background: '#fff',
+                width: '40%',
+                height: '100%',
+                display: 'flex',
+                alignItems: 'stretch',
+                justifyContent: 'center',
+                padding: 0,
+                position: 'relative',
+                overflow: 'hidden',
+                margin: 0,
+              }}
+            >
+              <img
+                src={film.film_thumbnail_vertical}
+                alt={film.title}
+                style={{ width: '100%', height: '100%', objectFit: 'cover', borderTopLeftRadius: 18, borderBottomLeftRadius: 18, borderTopRightRadius: 0, borderBottomRightRadius: 0, display: 'block', margin: 0, padding: 0 }}
+              />
+            </div>
+            {/* Right: Details */}
+            <div
+              style={{
+                flex: 1,
+                width: '60%',
+                height: '100%',
+                background: '#f5f5f7',
+                borderTopRightRadius: 18,
+                borderBottomRightRadius: 18,
+                padding: 24,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'flex-start',
+                position: 'relative',
+                minWidth: 120,
+                boxShadow: 'none',
+              }}
+            >
+              {/* Top: Text content */}
+              <div className="w-full flex flex-col items-center" style={{padding: 0, margin: 0}}>
+                <div className="text-base md:text-lg font-bold text-black text-center mb-2" style={{marginTop: 0, marginBottom: 8}}>
+                  {film.title} {film.release_year && `(${film.release_year}${film.language ? ', ' + film.language : ''})`}
+                </div>
+                <div className="mb-2" style={{fontSize: '2.2rem', lineHeight: 1}}>
+                  <span role="img" aria-label="party" style={{fontSize: '2.2rem', verticalAlign: 'middle'}}>🎉</span>
+                </div>
+                <div className="font-bold mb-2" style={{color: '#b83280', fontSize: '1rem', textAlign: 'center', marginBottom: 8}}>Tiket Bought Successfully !</div>
+                <div className="text-sm text-black mb-2 flex items-center gap-1 justify-center" style={{fontWeight: 500}}>
+                  Enjoy your movie <span role="img" aria-label="point" style={{fontSize: '1rem', verticalAlign: 'middle'}}>👉</span>
+                </div>
+                {ticketExpiry && (
+                  <div className="text-xs mt-3" style={{color: '#e75480', fontWeight: 500, textAlign: 'center', marginTop: 10}}>
+                    Tiket expires on : <span className="font-semibold" style={{color: '#222'}}>{new Date(ticketExpiry).toLocaleString(undefined, { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                  </div>
+                )}
+              </div>
+              {/* Bottom: Buttons */}
+              <div className="w-full flex flex-row items-center justify-center gap-3" style={{marginTop: 'auto', paddingTop: 16}}>
+                <button
+                  className="px-4 py-2 rounded-lg font-bold text-white bg-tiketx-blue hover:bg-tiketx-pink transition-colors"
+                  style={{fontSize: '0.95rem'}}
+                  onClick={() => {
+                    setShowCelebration(false);
+                    setShowConfetti(false);
+                    navigate(`/watch/${film.id}`);
+                  }}
+                >
+                  Watch Now
+                </button>
+                <button
+                  className="px-4 py-2 rounded-lg font-bold text-black bg-gray-200 hover:bg-gray-300 transition-colors"
+                  style={{fontSize: '0.95rem'}}
+                  onClick={() => {
+                    setShowCelebration(false);
+                    setShowConfetti(false);
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      <LoginSignupModal open={loginModalOpen} onOpenChange={setLoginModalOpen} />
     </div>
   );
 };
