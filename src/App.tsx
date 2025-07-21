@@ -22,6 +22,7 @@ import About from './pages/About';
 import { useEffect, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { MobileBlocker } from './components/MobileBlocker';
 
 function AuthToastListener() {
   const { toast } = useToast();
@@ -55,32 +56,34 @@ const App = () => (
       <Toaster />
       <Sonner />
       <AuthToastListener />
-      <UserTicketsProvider>
-        <BrowserRouter>
-          <ScrollToTop />
-          <Routes>
-            <Route path="*" element={
-              <Layout>
-                <Routes>
-                  <Route path="/admin/login" element={<AdminLogin />} />
-                  <Route path="/" element={<Home />} />
-                  <Route path="/search" element={<Search />} />
-                  <Route path="/watch/:id" element={<Watch />} />
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/profile" element={<Profile />} />
-                  <Route path="/admin" element={<AdminPanel />} />
-                  <Route path="/movie/:id" element={<MovieDetail />} />
-                  <Route path="/my-tikets" element={<MyTikets />} />
-                  <Route path="/settings" element={<Settings />} />
-                  <Route path="/watchlist" element={<Watchlist />} />
-                  <Route path="/about" element={<About />} />
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </Layout>
-            } />
-          </Routes>
-        </BrowserRouter>
-      </UserTicketsProvider>
+      <MobileBlocker>
+        <UserTicketsProvider>
+          <BrowserRouter>
+            <ScrollToTop />
+            <Routes>
+              <Route path="*" element={
+                <Layout>
+                  <Routes>
+                    <Route path="/admin/login" element={<AdminLogin />} />
+                    <Route path="/" element={<Home />} />
+                    <Route path="/search" element={<Search />} />
+                    <Route path="/watch/:id" element={<Watch />} />
+                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/profile" element={<Profile />} />
+                    <Route path="/admin" element={<AdminPanel />} />
+                    <Route path="/movie/:id" element={<MovieDetail />} />
+                    <Route path="/my-tikets" element={<MyTikets />} />
+                    <Route path="/settings" element={<Settings />} />
+                    <Route path="/watchlist" element={<Watchlist />} />
+                    <Route path="/about" element={<About />} />
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </Layout>
+              } />
+            </Routes>
+          </BrowserRouter>
+        </UserTicketsProvider>
+      </MobileBlocker>
     </TooltipProvider>
   </QueryClientProvider>
 );
