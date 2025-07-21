@@ -200,7 +200,7 @@ const AdminPanel = () => {
 
   // Add state for creator modal and form at the top of AdminPanel
   const [showCreatorModal, setShowCreatorModal] = useState(false);
-  const [creatorForm, setCreatorForm] = useState({ name: '', profile_image: '', imageFile: null, bio: '' });
+  const [creatorForm, setCreatorForm] = useState({ id: null, name: '', profile_image: '', imageFile: null, bio: '' });
   const [savingCreator, setSavingCreator] = useState(false);
 
   // Fetch creators on mount
@@ -1314,7 +1314,10 @@ const AdminPanel = () => {
           <div className="space-y-6">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-2xl font-bold">Manage Creators</h2>
-              <Button onClick={() => setShowCreatorModal(true)}>
+              <Button onClick={() => {
+                setCreatorForm({ id: null, name: '', profile_image: '', imageFile: null, bio: '' });
+                setShowCreatorModal(true);
+              }}>
                 <Plus size={20} /> <span>Add Creator</span>
               </Button>
             </div>
@@ -1324,28 +1327,27 @@ const AdminPanel = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="font-semibold">{creator.name}</h3>
-                      <p className="text-sm text-gray-400">{creator.email}</p>
                       <div className="flex items-center space-x-4 mt-2 text-sm">
                         <span>{creator.filmsCount} films</span>
                         <span>Revenue: {creator.totalRevenue}</span>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-4">
-                      <span className={`px-3 py-1 rounded-lg text-sm ${
-                        creator.status === 'Approved' 
-                          ? 'bg-green-500/20 text-green-400' 
-                          : 'bg-yellow-500/20 text-yellow-400'
-                      }`}>
-                        {creator.status}
-                      </span>
-                      <div className="flex space-x-2">
-                        <Button className="gradient-button text-sm px-3 py-1">
-                          {creator.status === 'Approved' ? 'Edit' : 'Approve'}
-                        </Button>
-                        <Button type="button" variant="destructive" size="sm" onClick={() => handleDeleteCreator(creator.id)}>
-                          <Trash2 size={18} />
-                        </Button>
-                      </div>
+                    <div className="flex items-center space-x-2">
+                      <Button className="gradient-button text-sm px-3 py-1" onClick={() => {
+                        setCreatorForm({
+                          id: creator.id,
+                          name: creator.name || '',
+                          profile_image: creator.profile_image || '',
+                          imageFile: null,
+                          bio: creator.bio || '',
+                        });
+                        setShowCreatorModal(true);
+                      }}>
+                        Edit
+                      </Button>
+                      <Button type="button" variant="destructive" size="sm" onClick={() => handleDeleteCreator(creator.id)}>
+                        <Trash2 size={18} />
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -1427,7 +1429,7 @@ const AdminPanel = () => {
     setSavingCreator(false);
     if (!error) {
       setShowCreatorModal(false);
-      setCreatorForm({ name: '', profile_image: '', imageFile: null, bio: '' });
+      setCreatorForm({ id: null, name: '', profile_image: '', imageFile: null, bio: '' });
       // Refresh creators list
       const { data, error: fetchError } = await supabase.from('creators').select('id, name, profile_image').order('name');
       if (!fetchError && data) setCreators(data);
@@ -1542,19 +1544,70 @@ const AdminPanel = () => {
       <Dialog open={showCreatorModal} onOpenChange={setShowCreatorModal}>
         <DialogContent className="w-full max-w-lg p-8 rounded-2xl">
           <DialogHeader>
-            <DialogTitle>Add Creator</DialogTitle>
-            <DialogDescription>Fill out the details to add a new creator.</DialogDescription>
+            <DialogTitle>{creatorForm.id ? 'Edit Creator' : 'Add Creator'}</DialogTitle>
+            <DialogDescription>Fill out the details to {creatorForm.id ? 'edit' : 'add'} a creator.</DialogDescription>
           </DialogHeader>
-          <form className="flex flex-col gap-4" onSubmit={handleCreatorSubmit}>
+          <form className="flex flex-col gap-4" onSubmit={async (e) => {
+            e.preventDefault();
+            setSavingCreator(true);
+            let profileImageUrl = creatorForm.profile_image;
+            if (creatorForm.imageFile) {
+              const file = creatorForm.imageFile;
+              const fileExt = file.name.split('.').pop();
+              const filePath = `creatorImages/${Date.now()}.${fileExt}`;
+              const { data: uploadData, error: uploadError } = await supabase.storage.from('creators').upload(filePath, file);
+              if (!uploadError) {
+                const { data: signedUrlData, error: signedUrlError } = await supabase.storage.from('creators').createSignedUrl(filePath, 1576800000);
+                if (!signedUrlError && signedUrlData) {
+                  profileImageUrl = signedUrlData.signedUrl;
+                }
+              }
+            }
+            let error;
+            if (creatorForm.id) {
+              // Edit existing creator
+              ({ error } = await supabase.from('creators').update({
+                name: creatorForm.name,
+                profile_image: profileImageUrl,
+                bio: creatorForm.bio,
+              }).eq('id', creatorForm.id));
+            } else {
+              // Add new creator
+              ({ error } = await supabase.from('creators').insert({
+                name: creatorForm.name,
+                profile_image: profileImageUrl,
+                bio: creatorForm.bio,
+              }));
+            }
+            setSavingCreator(false);
+            if (!error) {
+              setShowCreatorModal(false);
+              setCreatorForm({ id: null, name: '', profile_image: '', imageFile: null, bio: '' });
+              // Refresh creators list
+              const { data, error: fetchError } = await supabase.from('creators').select('id, name, profile_image, bio').order('name');
+              if (!fetchError && data) setCreators(data);
+              toast({ title: creatorForm.id ? 'Creator updated successfully' : 'Creator added successfully', duration: 2500 });
+            } else {
+              toast({ title: 'Failed to save creator', description: error.message, variant: 'destructive' });
+            }
+          }}>
             <label className="block mb-1">Name</label>
             <Input placeholder="Name" value={creatorForm.name} onChange={e => setCreatorForm(f => ({ ...f, name: e.target.value }))} required />
             <label className="block mb-1">Profile Image (optional)</label>
+            {creatorForm.profile_image && (
+              <div className="mb-2 flex items-center gap-3">
+                <img src={creatorForm.profile_image} alt="Profile" className="h-16 w-16 rounded-full object-cover border border-white/10" />
+                <Button type="button" variant="destructive" size="sm" onClick={() => setCreatorForm(f => ({ ...f, profile_image: '', imageFile: null }))}>
+                  Remove
+                </Button>
+              </div>
+            )}
             <Input type="file" accept="image/*" onChange={e => setCreatorForm(f => ({ ...f, imageFile: e.target.files?.[0] }))} />
             <label className="block mb-1">Bio (optional)</label>
             <Input placeholder="Short bio" value={creatorForm.bio} onChange={e => setCreatorForm(f => ({ ...f, bio: e.target.value }))} />
             <div className="flex justify-end gap-2 mt-4">
               <Button type="button" variant="secondary" onClick={() => setShowCreatorModal(false)}>Cancel</Button>
-              <Button type="submit" variant="default" disabled={savingCreator}>{savingCreator ? 'Saving...' : 'Add Creator'}</Button>
+              <Button type="submit" variant="default" disabled={savingCreator}>{savingCreator ? 'Saving...' : (creatorForm.id ? 'Save Changes' : 'Add Creator')}</Button>
             </div>
           </form>
         </DialogContent>

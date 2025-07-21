@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import Home from "./pages/Home";
 import MovieDetail from "./pages/MovieDetail";
@@ -25,21 +25,25 @@ import { supabase } from '@/integrations/supabase/client';
 
 function AuthToastListener() {
   const { toast } = useToast();
-  const isFirstEvent = useRef(true);
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
-      if (isFirstEvent.current) {
-        isFirstEvent.current = false;
-        return; // Ignore the first event (page load)
-      }
-      if (event === 'SIGNED_IN') {
+      if (event === 'SIGNED_IN' && !sessionStorage.getItem('tiketx_signed_in_toast')) {
         toast({ title: 'Signed in successfully!' });
+        sessionStorage.setItem('tiketx_signed_in_toast', '1');
       }
     });
     return () => {
       authListener?.subscription.unsubscribe();
     };
   }, [toast]);
+  return null;
+}
+
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
   return null;
 }
 
@@ -53,6 +57,7 @@ const App = () => (
       <AuthToastListener />
       <UserTicketsProvider>
         <BrowserRouter>
+          <ScrollToTop />
           <Routes>
             <Route path="*" element={
               <Layout>
