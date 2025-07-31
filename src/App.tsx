@@ -19,6 +19,7 @@ import Settings from "./pages/Settings";
 import { UserTicketsProvider } from './hooks/useUserTickets';
 import Watchlist from './pages/Watchlist';
 import About from './pages/About';
+import Landing from "./pages/Landing";
 import { useEffect, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -61,6 +62,7 @@ const App = () => (
           <BrowserRouter>
             <ScrollToTop />
             <Routes>
+              <Route path="/landing" element={<Landing />} />
               <Route path="*" element={
                 <Layout>
                   <Routes>

@@ -65,13 +65,13 @@ export const LoginSignupModal: React.FC<LoginSignupModalProps> = ({ open, onOpen
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="backdrop-blur-xl bg-black/80 border-none shadow-2xl max-w-md rounded-2xl p-0 overflow-hidden">
-        {/* Logo */}
-        <div className="absolute left-6 top-6 z-10">
-          <img src="/mobile-logo.png" alt="TiketX Logo" className="h-8 w-auto opacity-80" />
-        </div>
+        {/* Logo removed from top left */}
         <div className="flex flex-col items-center pt-12 pb-8 px-8">
           <DialogHeader className="w-full">
-            <DialogTitle className="text-2xl font-bold text-white mb-2 text-center">Welcome to TiketX</DialogTitle>
+            <DialogTitle className="text-2xl font-bold text-white mb-6 text-center flex items-center justify-center gap-3">
+              Welcome to
+              <img src="/tiketx-logo-text.png" alt="TiketX Logo" className="h-8 w-auto opacity-90 align-middle" />
+            </DialogTitle>
             <DialogDescription className="text-center text-white/70 mb-8">
               Login or sign up with Google to continue
             </DialogDescription>
