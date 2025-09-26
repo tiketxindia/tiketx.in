@@ -1,18 +1,79 @@
 
 import { Home, Search, Grid3X3, Bookmark, Ticket, Settings, Menu, X, ChevronLeft } from 'lucide-react';
+import { LuLayoutDashboard } from 'react-icons/lu';
 import { NavLink } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 
 export const SidebarNavigation = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [hasSubmissions, setHasSubmissions] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const navItems = [
+  // Check if user has film submissions
+  useEffect(() => {
+    const checkSubmissions = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data, error } = await supabase
+            .from('film_submissions')
+            .select('id')
+            .eq('user_id', user.id)
+            .limit(1);
+          
+          if (!error && data && data.length > 0) {
+            setHasSubmissions(true);
+          } else {
+            setHasSubmissions(false);
+          }
+        } else {
+          setHasSubmissions(false);
+        }
+      } catch (error) {
+        console.error('Error checking submissions:', error);
+        setHasSubmissions(false);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkSubmissions();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+        checkSubmissions();
+      }
+    });
+
+    // Listen for film submission events
+    const handleFilmSubmission = () => {
+      checkSubmissions();
+    };
+
+    window.addEventListener('filmSubmitted', handleFilmSubmission);
+
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener('filmSubmitted', handleFilmSubmission);
+    };
+  }, []);
+
+  const baseNavItems = [
     { icon: Home, label: 'Home', path: '/' },
     { icon: Search, label: 'Search', path: '/search' },
     { icon: Bookmark, label: 'Watchlist', path: '/watchlist' },
     { icon: Ticket, label: 'My Tikets', path: '/my-tikets' },
     { icon: Settings, label: 'Settings', path: '/settings' }
   ];
+
+  // Add Creator Dashboard at the bottom if user has submissions
+  const creatorNavItems = hasSubmissions ? [
+    { icon: LuLayoutDashboard, label: 'Creator Dashboard', path: '/creator' }
+  ] : [];
+
+  const navItems = [...baseNavItems, ...creatorNavItems];
 
   // Add CSS custom property to communicate collapsed state to the document
   useEffect(() => {
@@ -47,9 +108,9 @@ export const SidebarNavigation = () => {
           </div>
           
           {/* Navigation Items */}
-          <div className="flex-1 py-8">
-            <div className="space-y-3 px-4">
-              {navItems.map(({ icon: Icon, label, path }) => (
+          <div className="flex-1 py-8 flex flex-col">
+            <div className="space-y-3 px-4 flex-1">
+              {baseNavItems.map(({ icon: Icon, label, path }) => (
                 <NavLink
                   key={path}
                   to={path}
@@ -68,6 +129,27 @@ export const SidebarNavigation = () => {
                 </NavLink>
               ))}
             </div>
+            
+            {/* Creator Dashboard at bottom */}
+            {hasSubmissions && (
+              <div className="px-4 pb-4">
+                <NavLink
+                  to="/creator"
+                  className={({ isActive }) =>
+                    `flex ${isCollapsed ? 'flex-col items-center justify-center' : 'flex-row items-center'} px-4 py-2 rounded-xl transition-all duration-200 group ${
+                      isActive
+                        ? 'bg-gradient-to-r from-tiketx-blue/20 via-tiketx-violet/20 to-tiketx-pink/20 text-white border border-white/20'
+                        : 'text-gray-400 hover:text-white hover:bg-white/10'
+                    }`
+                  }
+                >
+                  <div className="flex items-center justify-center w-[41px] h-[41px] rounded-lg transition-all duration-200">
+                    <LuLayoutDashboard size={21} />
+                  </div>
+                  {!isCollapsed && <span className="font-medium text-lg ml-4">Creator Dashboard</span>}
+                </NavLink>
+              </div>
+            )}
           </div>
         </div>
       </nav>

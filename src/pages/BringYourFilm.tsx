@@ -28,6 +28,16 @@ const BringYourFilm = () => {
     (async () => {
       const { data } = await supabase.auth.getUser();
       setUser(data?.user || null);
+      
+      // Auto-fill name and email from user profile
+      if (data?.user) {
+        setForm(prev => ({
+          ...prev,
+          name: data.user.user_metadata?.full_name || data.user.user_metadata?.name || '',
+          email: data.user.email || '',
+        }));
+      }
+      
       setAuthChecking(false);
     })();
   }, []);
@@ -78,6 +88,10 @@ const BringYourFilm = () => {
       });
       if (error) throw error;
       toast({ title: 'Thanks! We received your submission.' });
+      
+      // Dispatch custom event to update navigation
+      window.dispatchEvent(new CustomEvent('filmSubmitted'));
+      
       navigate('/creator');
     } catch (err: any) {
       toast({ title: 'Submission failed', description: err?.message || 'Please try again later.', variant: 'destructive' });
@@ -111,22 +125,63 @@ const BringYourFilm = () => {
 
   return (
     <div className="min-h-screen bg-black text-white px-4 md:px-8 py-10 flex items-start justify-center">
-      <div className="w-full max-w-3xl">
-        <div className="flex items-center justify-center mb-8">
-          <img src="/tiketx-logo-text.png" alt="TiketX" className="h-10 w-auto opacity-90" />
+      <div className="w-full max-w-6xl">
+        {/* Header Section */}
+        <div className="text-center mb-16">
+          {/* Logo */}
+          <div className="flex items-center justify-center mb-8">
+            <div className="relative">
+              <img src="/tiketx-logo-text.png" alt="TiketX" className="h-14 w-auto opacity-95" />
+              <div className="absolute -inset-2 bg-gradient-to-r from-tiketx-blue/20 via-tiketx-violet/20 to-tiketx-pink/20 rounded-2xl blur-xl -z-10"></div>
+            </div>
+          </div>
+          
+          {/* Main Title */}
+          <div className="relative mb-6">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-black bg-gradient-to-r from-white via-gray-100 to-gray-300 bg-clip-text text-transparent mb-2 tracking-tight">
+              Bring Your Film to TiketX
+            </h1>
+            <div className="absolute -inset-4 bg-gradient-to-r from-tiketx-blue/10 via-tiketx-violet/10 to-tiketx-pink/10 rounded-3xl blur-2xl -z-10"></div>
+          </div>
+          
+          {/* Subtitle */}
+          <div className="max-w-4xl mx-auto">
+            <p className="text-xl md:text-2xl text-gray-300 leading-relaxed font-light">
+              Submit your film details and we'll get in touch to help you 
+              <span className="bg-gradient-to-r from-tiketx-blue to-tiketx-violet bg-clip-text text-transparent font-semibold"> stream on TiketX</span>
+            </p>
+          </div>
+          
+          {/* Decorative Elements */}
+          <div className="flex items-center justify-center mt-8 space-x-4">
+            <div className="w-16 h-0.5 bg-gradient-to-r from-transparent via-tiketx-blue to-transparent"></div>
+            <div className="w-2 h-2 bg-tiketx-violet rounded-full animate-pulse"></div>
+            <div className="w-16 h-0.5 bg-gradient-to-r from-transparent via-tiketx-pink to-transparent"></div>
+          </div>
         </div>
-        <h1 className="text-3xl md:text-4xl font-extrabold text-center mb-2">Bring Your Film to TiketX</h1>
-        <p className="text-center text-gray-300 mb-8">Submit your film details and we’ll get in touch to help you stream on TiketX.</p>
 
         <form onSubmit={handleSubmit} className="bg-white/5 border border-white/10 rounded-2xl p-6 md:p-8 space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
               <label className="block text-sm text-gray-300 mb-2">Name *</label>
-              <input name="name" value={form.name} onChange={handleChange} className="w-full bg-black/50 border border-white/20 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-tiketx-blue" />
+              <input 
+                name="name" 
+                value={form.name} 
+                readOnly 
+                className="w-full bg-gray-800/50 border border-gray-600/50 rounded-xl px-4 py-3 text-gray-300 cursor-not-allowed" 
+              />
+              <p className="text-xs text-gray-500 mt-1">Auto-filled from your profile</p>
             </div>
             <div>
               <label className="block text-sm text-gray-300 mb-2">Email *</label>
-              <input type="email" name="email" value={form.email} onChange={handleChange} className="w-full bg-black/50 border border-white/20 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-tiketx-blue" />
+              <input 
+                type="email" 
+                name="email" 
+                value={form.email} 
+                readOnly 
+                className="w-full bg-gray-800/50 border border-gray-600/50 rounded-xl px-4 py-3 text-gray-300 cursor-not-allowed" 
+              />
+              <p className="text-xs text-gray-500 mt-1">Auto-filled from your profile</p>
             </div>
             <div>
               <label className="block text-sm text-gray-300 mb-2">WhatsApp (include country code) *</label>
