@@ -14,7 +14,7 @@ const Footer = ({ className = '' }) => {
           </ul>
           <div className="mt-7 text-xs text-gray-400">© 2025 TiketX. All Rights Reserved.</div>
           <div className="mt-2 flex flex-wrap gap-3.5 text-xs text-gray-400">
-            <a href="#" className="hover:underline">Terms Of Use</a>
+            <Link to="/terms-of-service" className="hover:underline">Terms Of Service</Link>
             <a href="#" className="hover:underline">Privacy Policy</a>
             <a href="#" className="hover:underline">FAQ</a>
           </div>

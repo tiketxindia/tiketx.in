@@ -19,8 +19,8 @@ export function MobileBlocker({ children }: { children: React.ReactNode }) {
     return (
       <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black text-white text-center px-6" style={{minHeight: "100vh"}}>
         <img src="/tiketx-logo-text.png" alt="TiketX Logo" className="h-14 w-auto mb-8" />
-        <div className="text-xl font-semibold mb-2">This app is currently available for desktop use only.</div>
-        <div className="text-lg text-gray-400">Please access it from a desktop or laptop device.</div>
+        <div className="text-xl font-semibold mb-2">Tiny screen? Nah… Our films need a stage!</div>
+        <div className="text-lg text-gray-400">Open us on a laptop/desktop for the full experience.</div>
         <div className="flex flex-col items-center justify-center mt-28">
           <div className="text-base font-medium text-gray-400 mb-2">Coming soon on</div>
           <div className="flex flex-row gap-4 items-center">

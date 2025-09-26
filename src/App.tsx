@@ -24,6 +24,9 @@ import { useEffect, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { MobileBlocker } from './components/MobileBlocker';
+import BringYourFilm from "./pages/BringYourFilm";
+import TermsOfService from "./pages/TermsOfService";
+import CreatorDashboard from "./pages/CreatorDashboard";
 
 function AuthToastListener() {
   const { toast } = useToast();
@@ -78,6 +81,9 @@ const App = () => (
                     <Route path="/settings" element={<Settings />} />
                     <Route path="/watchlist" element={<Watchlist />} />
                     <Route path="/about" element={<About />} />
+                    <Route path="/bring-your-film" element={<BringYourFilm />} />
+                    <Route path="/creator" element={<CreatorDashboard />} />
+                    <Route path="/terms-of-service" element={<TermsOfService />} />
                     <Route path="*" element={<NotFound />} />
                   </Routes>
                 </Layout>

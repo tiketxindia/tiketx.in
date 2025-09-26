@@ -249,7 +249,14 @@ const Home = () => {
               )}
             </div>
           </div>
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-6 md:space-x-8">
+            <a
+              href="/bring-your-film"
+              className="hidden sm:inline-flex items-center px-3 py-2 rounded-xl font-semibold text-sm bg-black/40 border border-white/30 text-white shadow hover:bg-white/10 transition"
+            >
+              <span className="mr-4 text-sm md:text-base font-semibold tracking-tight">Bring Your Film to</span>
+              <img src="/tiketx-logo-text.png" alt="TiketX" className="h-7 w-auto" />
+            </a>
             <span className="text-lg font-semibold bg-gradient-to-r from-tiketx-blue via-tiketx-violet to-tiketx-pink bg-clip-text text-transparent">
               {(() => {
                 let name = user?.user_metadata?.name;
