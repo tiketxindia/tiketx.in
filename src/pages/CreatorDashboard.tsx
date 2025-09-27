@@ -166,29 +166,35 @@ const CreatorDashboard = () => {
                     {/* Header */}
                     <div className="flex items-start justify-between mb-8">
                       <div className="flex-1">
-                        <div className="flex items-center gap-4 mb-3">
-                          <div className="w-16 h-16 bg-gradient-to-r from-tiketx-blue to-tiketx-violet rounded-2xl flex items-center justify-center">
-                            <span className="text-2xl font-bold text-white">
-                              {s.film_title.charAt(0).toUpperCase()}
-                            </span>
-                          </div>
-                          <div>
-                            <h2 className="text-3xl font-bold mb-2">{s.film_title}</h2>
-                            <div className="flex items-center gap-2 text-gray-400">
-                              <Calendar className="w-4 h-4" />
-                              <span>Submitted on {new Date(s.submitted_at).toLocaleDateString('en-US', { 
-                                year: 'numeric', 
-                                month: 'long', 
-                                day: 'numeric' 
-                              })}</span>
+                        {/* Film Title */}
+                        <div className="mb-6">
+                          <h2 className="text-4xl md:text-5xl font-black bg-gradient-to-r from-[#3ABDFE] to-[#FF7D52] bg-clip-text text-transparent mb-4 tracking-tight">
+                            {s.film_title}
+                          </h2>
+                          
+                          {/* Submitted Date */}
+                          <div className="flex items-center gap-3 mb-6">
+                            <div className="flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full">
+                              <Calendar className="w-4 h-4 text-tiketx-blue" />
+                              <span className="text-sm font-semibold text-gray-300">
+                                Submitted on {new Date(s.submitted_at).toLocaleDateString('en-US', { 
+                                  year: 'numeric', 
+                                  month: 'long', 
+                                  day: 'numeric' 
+                                })}
+                              </span>
                             </div>
                           </div>
+                          
+                          {/* Synopsis */}
+                          {s.synopsis && (
+                            <div className="mt-4">
+                              <p className="text-gray-300 text-base leading-relaxed">
+                                {s.synopsis}
+                              </p>
+                            </div>
+                          )}
                         </div>
-                        {s.synopsis && (
-                          <p className="text-gray-300 text-lg leading-relaxed max-w-3xl">
-                            {s.synopsis}
-                          </p>
-                        )}
                       </div>
                       <button className="flex items-center gap-2 px-6 py-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-2xl transition-all duration-200 group-hover:scale-105">
                         <Eye className="w-5 h-5" />
