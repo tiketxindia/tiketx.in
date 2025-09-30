@@ -1,3 +1,8 @@
+import OnboardingChecklistEditor from "../components/OnboardingChecklistEditor";
+// ...existing imports...
+
+// ...existing imports...
+// ...existing code...
 import { useEffect, useState } from 'react';
 import { Upload, Image, Users, BarChart3, Settings, Plus, Edit, Trash2, CheckCircle, Film, GripVertical, Ticket } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -135,6 +140,70 @@ async function deleteMuxAssetByPlaybackId(playbackId) {
 }
 
 const AdminPanel = () => {
+  // Temp checklist steps for onboarding modal
+  const [tempChecklistSteps, setTempChecklistSteps] = useState([]);
+  // Onboarding modal state
+  const [showOnboardingModal, setShowOnboardingModal] = useState<{ open: boolean, subId: string | null }>({ open: false, subId: null });
+  useEffect(() => {
+    // Prevent browser caching of admin panel
+    document.cookie = 'Cache-Control=no-store, no-cache, must-revalidate';
+    if (typeof window !== 'undefined') {
+      const meta = document.createElement('meta');
+      meta.httpEquiv = 'Cache-Control';
+      meta.content = 'no-store, no-cache, must-revalidate';
+      document.head.appendChild(meta);
+    }
+  }, []);
+
+  // Initialize tempChecklistSteps when modal opens
+  useEffect(() => {
+    if (showOnboardingModal.open && showOnboardingModal.subId) {
+      const sub = filmSubmissions.find(s => s.id === showOnboardingModal.subId);
+      if (sub) {
+        const steps = Array.isArray(sub.onboarding_instructions)
+          ? sub.onboarding_instructions
+          : (sub.onboarding_instructions ? JSON.parse(sub.onboarding_instructions) : []);
+        setTempChecklistSteps(steps);
+      }
+    }
+  }, [showOnboardingModal.open, showOnboardingModal.subId]);
+  // Logout handler
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setIsAdmin(false);
+    setAuthChecked(false);
+    window.location.reload();
+  };
+  // Move renderContent above JSX usage
+  // Remove duplicate renderContent, keep only the main one below (around line 842)
+  // Helper for signed URLs
+  const getSignedUrl = async (filePath: string, type: string) => {
+    const { data: signedUrlData, error: signedUrlError } = await supabase.storage.from('films').createSignedUrl(filePath, 1576800000);
+    if (signedUrlError || !signedUrlData) {
+      alert(`Failed to get ${type} thumbnail URL`);
+      setSavingFilm(false);
+      return null;
+    }
+    return signedUrlData.signedUrl;
+  };
+  // Move renderContent above its usage
+  // Admin authentication state
+  const [authChecked, setAuthChecked] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    async function checkAuth() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user?.email === 'tiketxindia@gmail.com') {
+        setIsAdmin(true);
+      } else {
+        setIsAdmin(false);
+        window.location.replace('/admin/login');
+      }
+      setAuthChecked(true);
+    }
+    checkAuth();
+  }, []);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [banners, setBanners] = useState<any[]>([]);
   const [showBannerModal, setShowBannerModal] = useState(false);
@@ -433,29 +502,21 @@ const AdminPanel = () => {
   }
 
   // Remove image handler for both banner and title images
-  async function handleRemoveImage(type: 'banner' | 'title' | 'trailer') {
-    let url = type === 'banner' ? bannerForm.banner_image : type === 'title' ? bannerForm.title_image : bannerForm.trailerFile;
-    if (!url) {
+  async function handleRemoveImage(imageType: 'banner' | 'title' | 'trailer') {
+    const removeType = confirmRemove.type;
+    if (!removeType) return;
+    const removeUrl = removeType === 'banner' ? bannerForm.banner_image : removeType === 'title' ? bannerForm.title_image : bannerForm.trailerFile;
+    if (!removeUrl) {
       setBannerForm(f => ({
         ...f,
-        [type === 'banner' ? 'banner_image' : type === 'title' ? 'title_image' : 'trailerFile']: null,
+        [removeType === 'banner' ? 'banner_image' : removeType === 'title' ? 'title_image' : 'trailerFile']: null,
       }));
-      return;
-    }
-    setConfirmRemove({ type, open: true });
-  }
-
-  async function confirmRemoveImage() {
-    if (!confirmRemove.type) return;
-    setPendingRemove(true);
-    const type = confirmRemove.type;
-    let url = type === 'banner' ? bannerForm.banner_image : type === 'title' ? bannerForm.title_image : bannerForm.trailerFile;
-    if (!url) {
       setPendingRemove(false);
       setConfirmRemove({ type: null, open: false });
       return;
     }
-    if (type === 'trailer' && url && !url.startsWith('http')) {
+    setPendingRemove(true);
+    if (removeType === 'trailer' && removeUrl && !removeUrl.startsWith('http')) {
       setDeleteTrailerProgress(0);
       setDeleteTrailerStatus('deleting');
       let progress = 0;
@@ -464,7 +525,7 @@ const AdminPanel = () => {
         setDeleteTrailerProgress(Math.min(progress, 90));
       }, 80);
       try {
-        await deleteMuxAssetByPlaybackId(url);
+  await deleteMuxAssetByPlaybackId(removeUrl);
         if (editingBannerId) {
           await supabase.from('banners').update({ trailerFile: null }).eq('id', editingBannerId);
         }
@@ -493,17 +554,17 @@ const AdminPanel = () => {
         return;
       }
     }
-    if (url.startsWith('http') && url.includes('supabase.co')) {
-      const path = getStoragePathFromUrl(url);
+    if (removeUrl.startsWith('http') && removeUrl.includes('supabase.co')) {
+      const path = getStoragePathFromUrl(removeUrl);
       if (path) {
-        setRemovingImage(type);
+        setRemovingImage(removeType);
         const { error } = await supabase.storage.from('banners').remove([path]);
         setRemovingImage(null);
         if (!error) {
           toast({
-            title: type === 'title'
+            title: removeType === 'title'
               ? "Title image removed successfully. This change is already saved."
-              : type === 'banner'
+              : removeType === 'banner'
                 ? "Banner image removed successfully. This change is already saved."
                 : "Image removed successfully. This change is already saved.",
             duration: 3500,
@@ -519,7 +580,7 @@ const AdminPanel = () => {
     }
     setBannerForm(f => ({
       ...f,
-      [type === 'banner' ? 'banner_image' : type === 'title' ? 'title_image' : 'trailerFile']: null,
+      [removeType === 'banner' ? 'banner_image' : removeType === 'title' ? 'title_image' : 'trailerFile']: null,
     }));
     setPendingRemove(false);
     setConfirmRemove({ type: null, open: false });
@@ -548,13 +609,17 @@ const AdminPanel = () => {
         setSavingFilm(false);
         return;
       }
-      const { data: signedUrlData, error: signedUrlError } = await supabase.storage.from('films').createSignedUrl(filePath, 1576800000);
-      if (signedUrlError || !signedUrlData) {
-        alert('Failed to get trailer thumbnail URL');
-        setSavingFilm(false);
-        return;
-      }
-      trailerThumbUrl = signedUrlData.signedUrl;
+      // Ensure this code is inside an async function
+      const getSignedUrl = async (filePath: string, type: string) => {
+        const { data: signedUrlData, error: signedUrlError } = await supabase.storage.from('films').createSignedUrl(filePath, 1576800000);
+        if (signedUrlError || !signedUrlData) {
+          alert(`Failed to get ${type} thumbnail URL`);
+          setSavingFilm(false);
+          return null;
+        }
+        return signedUrlData.signedUrl;
+      };
+  trailerThumbUrl = await getSignedUrl(filePath, 'trailer');
     }
     // Upload fullsize thumbnail
     if (filmForm.fullsizeThumbFile) {
@@ -567,13 +632,7 @@ const AdminPanel = () => {
         setSavingFilm(false);
         return;
       }
-      const { data: signedUrlData, error: signedUrlError } = await supabase.storage.from('films').createSignedUrl(filePath, 1576800000);
-      if (signedUrlError || !signedUrlData) {
-        alert('Failed to get fullsize thumbnail URL');
-        setSavingFilm(false);
-        return;
-      }
-      fullsizeThumbUrl = signedUrlData.signedUrl;
+  fullsizeThumbUrl = await getSignedUrl(filePath, 'fullsize');
     }
     // Upload vertical thumbnail
     if (filmForm.verticalThumbFile) {
@@ -586,13 +645,7 @@ const AdminPanel = () => {
         setSavingFilm(false);
         return;
       }
-      const { data: signedUrlData, error: signedUrlError } = await supabase.storage.from('films').createSignedUrl(filePath, 1576800000);
-      if (signedUrlError || !signedUrlData) {
-        alert('Failed to get vertical thumbnail URL');
-        setSavingFilm(false);
-        return;
-      }
-      verticalThumbUrl = signedUrlData.signedUrl;
+  verticalThumbUrl = await getSignedUrl(filePath, 'vertical');
     }
     // Upload horizontal thumbnail
     if (filmForm.horizontalThumbFile) {
@@ -605,13 +658,7 @@ const AdminPanel = () => {
         setSavingFilm(false);
         return;
       }
-      const { data: signedUrlData, error: signedUrlError } = await supabase.storage.from('films').createSignedUrl(filePath, 1576800000);
-      if (signedUrlError || !signedUrlData) {
-        alert('Failed to get horizontal thumbnail URL');
-        setSavingFilm(false);
-        return;
-      }
-      horizontalThumbUrl = signedUrlData.signedUrl;
+  horizontalThumbUrl = await getSignedUrl(filePath, 'horizontal');
     }
 
     // Prepare genres as array
@@ -775,8 +822,23 @@ const AdminPanel = () => {
     { id: 'films', label: 'Films', icon: Film },
     { id: 'sections', label: 'Homepage Sections', icon: Settings },
     { id: 'creators', label: 'Manage Creators', icon: Users },
+    { id: 'submissions', label: 'Film Submissions', icon: Upload },
     { id: 'sales', label: 'Viewers & Sales', icon: BarChart3 }
   ];
+  // State for film submissions
+  const [filmSubmissions, setFilmSubmissions] = useState([]);
+  const [loadingSubmissions, setLoadingSubmissions] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === 'submissions') {
+      setLoadingSubmissions(true);
+      supabase.from('film_submissions').select('*').order('submitted_at', { ascending: false })
+        .then(({ data, error }) => {
+          if (!error && data) setFilmSubmissions(data);
+          setLoadingSubmissions(false);
+        });
+    }
+  }, [activeTab]);
 
   const sections = [
     { id: 1, name: 'Trending Now', filmCount: 8, order: 1 },
@@ -784,8 +846,163 @@ const AdminPanel = () => {
     { id: 3, name: 'Regional Favourites', filmCount: 12, order: 3 }
   ];
 
+  // Main renderContent function (only one definition)
   const renderContent = () => {
     switch (activeTab) {
+      case 'submissions':
+        const stages = [
+          { key: 'submission', label: 'Submission', color: 'bg-blue-500' },
+          { key: 'onboarding', label: 'Onboarding', color: 'bg-purple-500' },
+          { key: 'review', label: 'Release', color: 'bg-yellow-500' },
+          { key: 'sales', label: 'Sales Dashboard', color: 'bg-green-500' },
+          { key: 'closure', label: 'Closure', color: 'bg-gray-500' },
+        ];
+
+        async function handleStageChange(subId, nextStage) {
+          const { error } = await supabase.from('film_submissions').update({ status_stage: nextStage }).eq('id', subId);
+          if (error) {
+            alert('Failed to update status: ' + error.message);
+            console.error('Supabase update error:', error);
+            return;
+          }
+          setFilmSubmissions(filmSubmissions => filmSubmissions.map(sub => sub.id === subId ? { ...sub, status_stage: nextStage } : sub));
+        }
+
+        return (
+          <div className="space-y-6">
+            <h2 className="text-2xl font-bold mb-4">Film Submissions</h2>
+            {loadingSubmissions ? (
+              <div className="text-center py-8 text-lg text-gray-400">Loading submissions...</div>
+            ) : filmSubmissions.length === 0 ? (
+              <div className="text-center py-8 text-lg text-gray-400">No submissions found.</div>
+            ) : (
+              <div className="flex flex-col gap-8">
+                {filmSubmissions.map(sub => {
+                  const currentStageIdx = stages.findIndex(s => s.key === sub.status_stage);
+                  return (
+                    <div key={sub.id} className="relative px-8 py-10 rounded-3xl bg-gradient-to-br from-black/90 via-black/70 to-tiketx-blue/20 border border-white/10 shadow-2xl backdrop-blur-xl" style={{boxShadow: '0 8px 32px 0 rgba(0,0,0,0.45), 0 1.5px 8px 0 rgba(30,64,175,0.12)'}}>
+                      {/* Modern horizontal timeline with connecting lines */}
+                      <div className="flex flex-col gap-10 md:gap-8">
+                        <div className="flex flex-row items-center justify-center relative z-10 mb-10 gap-0">
+                          {stages.map((stage, idx) => (
+                            <div key={stage.key} className="flex flex-col items-center flex-1 min-w-[110px] relative">
+                              <div className="flex flex-col items-center w-full relative">
+                                {stage.key === 'onboarding' && (
+                                  <button
+                                    className={`absolute w-10 h-10 top-0 left-1/2 -translate-x-1/2 z-20 bg-transparent cursor-pointer`}
+                                    style={{ outline: 'none', border: 'none' }}
+                                    onClick={() => setShowOnboardingModal({ open: true, subId: sub.id })}
+                                    aria-label="Edit onboarding instructions"
+                                  />
+                                )}
+                                {/* Connecting line to next dot, rendered behind the dot */}
+                                {idx < stages.length - 1 && (
+                                  <div className="absolute top-5 left-1/2 w-[calc(100%-2.5rem)] h-2 -z-10 flex items-center pointer-events-none" style={{ marginLeft: '20px' }}>
+                                    <div className={`h-2 w-full rounded-full ${idx < currentStageIdx ? 'bg-gradient-to-r from-tiketx-violet via-tiketx-pink to-tiketx-blue opacity-80' : 'bg-gray-700 opacity-40'} transition-all duration-300`} />
+                                  </div>
+                                )}
+                                <div className={`w-10 h-10 rounded-full border-2 flex items-center justify-center mx-auto transition-all duration-300 shadow-xl bg-gradient-to-br from-black/80 to-tiketx-blue/30 ${idx < currentStageIdx ? stage.color + ' ring-4 ring-tiketx-pink/30' : idx === currentStageIdx ? stage.color + ' ring-4 ring-tiketx-pink/30 animate-pulse' : 'border-gray-700'}`}
+                                     style={idx === currentStageIdx ? { boxShadow: '0 0 16px 4px #a78bfa, 0 0 32px 8px #6366f1' } : {}}>
+                                  {idx < currentStageIdx ? (
+                                    <span className="text-white text-lg font-bold">✓</span>
+                                  ) : idx === currentStageIdx ? (
+                                    <span className="w-5 h-5 rounded-full block bg-white/90 shadow-lg" />
+                                  ) : null}
+                                </div>
+                                <span className={`text-base font-semibold tracking-wide text-center mt-2 ${idx === currentStageIdx ? 'text-tiketx-blue drop-shadow-lg' : 'text-gray-400'}`}>{stage.label}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        {/* Submission details and controls */}
+                        {/* Onboarding Modal */}
+                        {showOnboardingModal.open && showOnboardingModal.subId === sub.id && (
+                          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                            <div className="bg-gradient-to-br from-black/90 via-black/70 to-tiketx-blue/20 rounded-2xl p-8 shadow-2xl border border-white/10 w-full max-w-2xl">
+                              <h2 className="text-2xl font-bold mb-4 text-tiketx-blue">Set Onboarding Instructions</h2>
+                              <label className="block text-lg font-bold text-tiketx-blue mb-2">Checklist Steps</label>
+                              <OnboardingChecklistEditor
+                                steps={tempChecklistSteps}
+                                onChange={steps => setTempChecklistSteps(steps)}
+                              />
+                              <div className="flex justify-end gap-4 mt-6">
+                                <button
+                                  className="px-6 py-2 rounded-xl bg-tiketx-blue text-white font-bold shadow hover:bg-tiketx-violet transition"
+                                  onClick={async () => {
+                                    await supabase.from('film_submissions').update({ onboarding_instructions: JSON.stringify(tempChecklistSteps) }).eq('id', sub.id);
+                                    setFilmSubmissions(filmSubmissions => filmSubmissions.map(s => s.id === sub.id ? { ...s, onboarding_instructions: tempChecklistSteps } : s));
+                                    setShowOnboardingModal({ open: false, subId: null });
+                                  }}
+                                >Save</button>
+                                <button className="px-6 py-2 rounded-xl bg-gray-600 text-white font-bold shadow hover:bg-gray-800 transition" onClick={() => setShowOnboardingModal({ open: false, subId: null })}>Close</button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        <div className="flex flex-col md:flex-row gap-10 items-start">
+                          <div className="flex-1 px-2 py-2 rounded-xl bg-gradient-to-br from-black/80 via-black/60 to-tiketx-blue/10 backdrop-blur-md shadow-2xl border border-white/10" style={{boxShadow: '0 4px 24px 0 rgba(0,0,0,0.35)'}}>
+                            {/* Onboarding instructions for admin */}
+                            <h3 className="font-extrabold text-3xl mb-3 text-tiketx-violet drop-shadow-xl tracking-tight">{sub.film_title}</h3>
+                            <div className="text-lg text-gray-200 mb-3 font-medium">Submitted by: <span className="font-bold text-white/95">{sub.name}</span> <span className="text-xs text-gray-400">({sub.email})</span></div>
+                            <div className="text-base text-gray-400 mb-2">Production House: <span className="font-semibold text-white/85">{sub.production_house_name}</span></div>
+                            <div className="text-base text-gray-400 mb-2">Country: <span className="font-semibold text-tiketx-blue">{sub.country}</span></div>
+                            <div className="text-base text-gray-400 mb-2">Expected Ticket Price: <span className="font-bold text-green-400">{sub.expected_ticket_price}</span></div>
+                            <div className="text-base text-gray-400 mb-2">Planned Release: <span className="font-semibold text-white/85">{sub.planned_release_date}</span></div>
+                            <div className="text-base text-gray-400 mb-2">Status: <span className="font-bold text-tiketx-blue uppercase tracking-wide">{sub.status_stage}</span></div>
+                            <div className="text-base text-gray-400 mb-2">Submitted At: <span className="font-semibold text-white/85">{new Date(sub.submitted_at).toLocaleString()}</span></div>
+                            <div className="text-base text-gray-400 mb-2">Preview Link: <a href={sub.preview_link} target="_blank" rel="noopener noreferrer" className="text-tiketx-violet underline font-bold hover:text-tiketx-pink transition-colors">{sub.preview_link}</a></div>
+                            <div className="text-base text-gray-400 mb-2">Synopsis: <span className="font-semibold text-white/85">{sub.synopsis}</span></div>
+                            {sub.message && <div className="text-base text-gray-400 mb-2">Message: <span className="font-semibold text-white/85">{sub.message}</span></div>}
+
+                            {/* Submission status card */}
+                            <div className="mt-6">
+                              <div className="rounded-2xl p-6 bg-gradient-to-br from-black/80 via-black/60 to-tiketx-blue/10 border border-white/10 shadow-lg flex flex-col items-center">
+                                <div className="mb-2">
+                                  {sub.status_stage === 'submission' ? (
+                                    <span className="inline-block px-4 py-2 rounded-xl bg-yellow-900/60 text-yellow-300 font-bold text-lg">Submission Awaiting Acceptance</span>
+                                  ) : sub.status_stage === 'onboarding' ? (
+                                    <span className="inline-block px-4 py-2 rounded-xl bg-green-900/60 text-green-300 font-bold text-lg">Submission Accepted</span>
+                                  ) : null}
+                                </div>
+                                <div className="text-center text-lg font-semibold text-white/90">
+                                  {sub.status_stage === 'submission' ? (
+                                    'Film submitted with basic details.'
+                                  ) : sub.status_stage === 'onboarding' ? (
+                                    <>Film submission accepted and onboarding started.</>
+                                  ) : sub.status_stage === 'review' ? (
+                                    'Your film is now released and available for viewers.'
+                                  ) : null}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex flex-col gap-4 min-w-[180px] items-end">
+                            {currentStageIdx < stages.length - 1 && (
+                              <button
+                                className="bg-gradient-to-r from-tiketx-pink to-tiketx-blue px-6 py-3 rounded-xl text-base font-bold text-white shadow-lg hover:scale-105 transition-all duration-200 w-full min-w-[200px]"
+                                onClick={() => handleStageChange(sub.id, stages[currentStageIdx + 1].key)}
+                              >
+                                Move to {stages[currentStageIdx + 1].label}
+                              </button>
+                            )}
+                            {currentStageIdx > 0 && (
+                              <button
+                                className="bg-gray-900/80 px-6 py-3 rounded-xl text-base font-bold text-gray-300 hover:bg-gray-700/80 shadow-lg transition-all duration-200 w-full min-w-[200px]"
+                                onClick={() => handleStageChange(sub.id, stages[currentStageIdx - 1].key)}
+                              >
+                                Revert to {stages[currentStageIdx - 1].label}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
       case 'dashboard':
         return (
           <div className="space-y-6">
@@ -1520,7 +1737,7 @@ const AdminPanel = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={pendingRemove}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmRemoveImage} disabled={pendingRemove} className="bg-red-600 hover:bg-red-700">
+            <AlertDialogAction onClick={() => handleRemoveImage(confirmRemove.type)} disabled={pendingRemove} className="bg-red-600 hover:bg-red-700">
               {pendingRemove ? 'Removing...' : 'Remove'}
             </AlertDialogAction>
           </AlertDialogFooter>
