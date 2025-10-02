@@ -7,8 +7,14 @@ type Submission = {
   synopsis?: string;
   status_stage: string;
   onboarding_instructions?: string | string[];
+  onboarding_fee?: number;
+  onboarding_fee_paid?: boolean;
+  onboarding_fee_paid_datetime?: string;
+  drive_link?: string;
+  agreed_terms?: boolean;
 };
 import UploadDocsModal from "@/components/UploadDocsModal";
+import { openRazorpayModal } from "@/lib/razorpay";
 // Timeline stages definition
 type StageKey = 'submission' | 'onboarding' | 'release' | 'sales' | 'closure';
 
@@ -80,10 +86,42 @@ function CreatorDashboard() {
   function handleStepComplete(idx: number) {
     setOnboardingSteps(steps => steps.map((step, i) => i === idx ? { ...step, completed: !step.completed } : step));
   }
-  function handleSubmitOnboarding() {
-    // TODO: Implement submit logic
-    setShowUploadModal(false);
-    setActiveSubmissionId(null);
+  async function handleSubmitOnboarding() {
+    if (!activeSubmissionId) return;
+    // Fetch onboarding fee (default Rs. 2000)
+    const onboardingFee = 2000;
+    // Create Razorpay order (simulate, or call backend if needed)
+    // For demo, just use amount in paise
+    openRazorpayModal({
+      amount: onboardingFee * 100,
+      name: "TiketX Onboarding Fee",
+      description: "Onboarding fee for film submission",
+      order_id: undefined,
+      onSuccess: async (payment) => {
+        // Save onboarding info only after payment
+        const { error } = await supabase
+          .from('film_submissions')
+          .update({
+            drive_link: driveLink,
+            agreed_terms: acceptTerms,
+            onboarding_fee: onboardingFee,
+            onboarding_fee_paid: true,
+            onboarding_fee_paid_datetime: new Date().toISOString(),
+            status_stage: 'review',
+          })
+          .eq('id', activeSubmissionId);
+        if (error) {
+          toast({ title: 'Failed to save onboarding info', variant: 'destructive' });
+        } else {
+          toast({ title: 'Onboarding info saved', variant: 'default' });
+        }
+        setShowUploadModal(false);
+        setActiveSubmissionId(null);
+      },
+      onFailure: () => {
+        toast({ title: 'Payment was not completed', variant: 'destructive' });
+      }
+    });
   }
 
   useEffect(() => {
@@ -98,10 +136,10 @@ function CreatorDashboard() {
       setAuthChecking(false);
       setLoading(true);
       const { data: rows, error } = await supabase
-        .from('film_submissions')
-        .select('id, film_title, synopsis, submitted_at, status_stage, onboarding_instructions')
-        .eq('user_id', data.user.id)
-        .order('submitted_at', { ascending: false });
+  .from('film_submissions')
+  .select('id, film_title, synopsis, submitted_at, status_stage, onboarding_instructions, onboarding_fee, onboarding_fee_paid, onboarding_fee_paid_datetime, drive_link, agreed_terms')
+  .eq('user_id', data.user.id)
+  .order('submitted_at', { ascending: false });
       if (error) {
         toast({ title: 'Failed to load submissions', variant: 'destructive' });
       } else {
@@ -211,14 +249,15 @@ function CreatorDashboard() {
                       <div className="flex flex-row gap-8 justify-center items-stretch mt-8">
                         {stages.map((stage, idx) => {
                           const isCompleted = idx < currentIdx;
-                          const isActive = idx === currentIdx;
+                          // Treat 'review_submission' as active for Submission stage
+                          const isActive = idx === currentIdx || (stage.key === 'submission' && s.status_stage === 'review_submission');
                           const isUpcoming = idx > currentIdx;
                           const IconComponent = stage.icon;
                           return (
                             <div key={stage.key} className="relative flex flex-col flex-1 min-w-0 max-w-xs mx-2">
                               <div className="flex flex-col items-center flex-1">
-                                <div className={"relative z-10 w-16 h-16 rounded-2xl flex items-center justify-center mb-4 transition-all duration-300 " + (isCompleted ? `bg-gradient-to-r ${stage.color} shadow-lg` : isActive ? "bg-gradient-to-r from-tiketx-blue to-tiketx-violet shadow-lg" : "bg-white/10 border-2 border-white/20") }>
-                                  <IconComponent className={`w-8 h-8 ${isCompleted || isActive ? "text-white" : "text-gray-400"}`} />
+                                <div className={"relative z-10 w-16 h-16 rounded-2xl flex items-center justify-center mb-4 transition-all duration-300 " + (isCompleted ? "bg-green-500 shadow-lg" : isActive ? "bg-gradient-to-r from-tiketx-blue to-tiketx-violet shadow-lg" : "bg-white/10 border-2 border-white/20") }>
+                                  <IconComponent className={`w-8 h-8 ${isCompleted ? 'text-white' : isActive ? 'text-white' : 'text-gray-400'}`} />
                                   {isCompleted && (<div className="absolute -top-1 -right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center"><CheckCircle className="w-4 h-4 text-white" /></div>)}
                                   {isActive && (<div className="absolute -top-1 -right-1 w-6 h-6 bg-tiketx-blue rounded-full flex items-center justify-center"><Clock className="w-4 h-4 text-white" /></div>)}
                                 </div>
@@ -227,43 +266,57 @@ function CreatorDashboard() {
                                     <h3 className={`${isCompleted || isActive ? "text-white" : "text-gray-400"} font-bold text-lg mb-2`}>{stage.label}</h3>
                                     <p className={`text-sm leading-relaxed mb-4 flex-1 ${isCompleted || isActive ? "text-gray-200" : "text-gray-500"}`}>{stage.description}</p>
                                     <div className="flex justify-center mb-4">
-                                      {stage.key === "submission" && (s.status_stage === "submission" ? (<span className="px-3 py-1 bg-yellow-900/60 text-yellow-300 rounded-full text-xs font-semibold border border-yellow-300/30">Acceptance Awaiting</span>) : s.status_stage === "onboarding" ? (<span className="px-3 py-1 bg-green-900/60 text-green-300 rounded-full text-xs font-semibold border border-green-300/30">Submission Accepted</span>) : (<span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-xs font-semibold border border-green-500/30">Completed</span>))}
+                                      {stage.key === "submission" && (
+                                        s.status_stage === "submission" ? (
+                                          <span className="px-3 py-1 bg-yellow-900/60 text-yellow-300 rounded-full text-xs font-semibold border border-yellow-300/30">Acceptance Awaiting</span>
+                                        ) : s.status_stage === "review_submission" ? (
+                                          <span className="px-3 py-1 bg-blue-900/60 text-blue-200 rounded-full text-xs font-semibold border border-blue-300/30">In Review</span>
+                                        ) : s.status_stage === "onboarding" ? (
+                                          <span className="px-3 py-1 bg-green-900/60 text-green-300 rounded-full text-xs font-semibold border border-green-300/30">Submission Accepted</span>
+                                        ) : (
+                                          <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-xs font-semibold border border-green-500/30">Completed</span>
+                                        )
+                                      )}
                                       {stage.key !== "submission" && isCompleted && (<span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-xs font-semibold border border-green-500/30">Completed</span>)}
-                                      {isActive && (<span className="px-3 py-1 bg-tiketx-blue/20 text-tiketx-blue rounded-full text-xs font-semibold border border-tiketx-blue/30">Active</span>)}
-                                      {isUpcoming && (<span className="px-3 py-1 bg-gray-500/20 text-gray-400 rounded-full text-xs font-semibold border border-gray-500/30">Upcoming</span>)}
+                                      {/* Removed explicit 'Active' tag as per new requirements */}
+                                      {stage.key !== "submission" && isUpcoming && (<span className="px-3 py-1 bg-gray-500/20 text-gray-400 rounded-full text-xs font-semibold border border-gray-500/30">Upcoming</span>)}
                                     </div>
                                     {isActive && stage.key === "onboarding" && (
-                                      <button
-                                        className="w-full px-4 py-2 bg-gradient-to-r from-tiketx-blue to-tiketx-violet hover:from-tiketx-violet hover:to-tiketx-pink rounded-xl font-semibold text-white transition-all duration-200 hover:scale-105 shadow-lg"
-                                        onClick={() => {
-                                          setShowUploadModal(true);
-                                          setActiveSubmissionId(s.id);
-                                          // Parse onboarding instructions for this submission
-                                          let steps: { id: number; label: string; completed: boolean }[] = [];
-                                          if (s.onboarding_instructions) {
-                                            try {
-                                              // Try to parse as JSON array
-                                              const arr = typeof s.onboarding_instructions === 'string' ? JSON.parse(s.onboarding_instructions) : s.onboarding_instructions;
-                                              if (Array.isArray(arr)) {
-                                                steps = arr.map((label: string, idx: number) => ({ id: idx + 1, label, completed: false }));
+                                      s.onboarding_fee_paid ? (
+                                        <span className="px-3 py-1 bg-yellow-900/60 text-yellow-300 rounded-full text-xs font-semibold border border-yellow-300/30">Awaiting Review</span>
+                                      ) : (
+                                        <button
+                                          className="w-full px-4 py-2 bg-gradient-to-r from-tiketx-blue to-tiketx-violet hover:from-tiketx-violet hover:to-tiketx-pink rounded-xl font-semibold text-white transition-all duration-200 hover:scale-105 shadow-lg"
+                                          onClick={() => {
+                                            setShowUploadModal(true);
+                                            setActiveSubmissionId(s.id);
+                                            // Parse onboarding instructions for this submission
+                                            let steps: { id: number; label: string; completed: boolean }[] = [];
+                                            if (s.onboarding_instructions) {
+                                              try {
+                                                // Try to parse as JSON array
+                                                const arr = typeof s.onboarding_instructions === 'string' ? JSON.parse(s.onboarding_instructions) : s.onboarding_instructions;
+                                                if (Array.isArray(arr)) {
+                                                  steps = arr.map((label: string, idx: number) => ({ id: idx + 1, label, completed: false }));
+                                                }
+                                              } catch {
+                                                // Fallback: treat as single string
+                                                steps = [{ id: 1, label: Array.isArray(s.onboarding_instructions) ? s.onboarding_instructions.join(', ') : String(s.onboarding_instructions), completed: false }];
                                               }
-                                            } catch {
-                                              // Fallback: treat as single string
-                                              steps = [{ id: 1, label: Array.isArray(s.onboarding_instructions) ? s.onboarding_instructions.join(', ') : String(s.onboarding_instructions), completed: false }];
+                                            } else {
+                                              // Fallback: default steps
+                                              steps = [
+                                                { id: 1, label: "Fill out personal details", completed: false },
+                                                { id: 2, label: "Upload identity proof", completed: false },
+                                                { id: 3, label: "Provide payment info", completed: false },
+                                              ];
                                             }
-                                          } else {
-                                            // Fallback: default steps
-                                            steps = [
-                                              { id: 1, label: "Fill out personal details", completed: false },
-                                              { id: 2, label: "Upload identity proof", completed: false },
-                                              { id: 3, label: "Provide payment info", completed: false },
-                                            ];
-                                          }
-                                          setOnboardingSteps(steps);
-                                        }}
-                                      >
-                                        Complete Onboarding
-                                      </button>
+                                            setOnboardingSteps(steps);
+                                          }}
+                                        >
+                                          Complete Onboarding
+                                        </button>
+                                      )
                                     )}
                                   </div>
                                 </div>
@@ -281,7 +334,7 @@ function CreatorDashboard() {
         </div>
         {showUploadModal && activeSubmissionId && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 backdrop-blur-sm">
-            <div className="bg-black bg-opacity-80 backdrop-blur-lg rounded-2xl shadow-2xl p-10 w-full max-w-2xl min-h-[600px] relative border border-gray-800 flex flex-col justify-center">
+  <div className="bg-black bg-opacity-75 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.85)] p-8 w-full max-w-5xl min-h-[400px] relative border-2 border-gray-900 flex flex-col justify-center" style={{ boxShadow: '0 8px 32px 0 rgba(0,0,0,0.85), 0 0 0 2px #23232a, 0 0 0 4px #35353c' }}>
               <button
                 className="absolute top-6 right-6 text-gray-400 hover:text-gray-600 text-2xl"
                 onClick={() => { setShowUploadModal(false); setActiveSubmissionId(null); }}
@@ -289,70 +342,79 @@ function CreatorDashboard() {
               >
                 &times;
               </button>
-              <h2 className="text-[1.5rem] font-bold text-center mb-1 text-white">
-                Onboarding of <span className="bg-gradient-to-r from-tiketx-blue via-tiketx-violet to-tiketx-pink bg-clip-text text-transparent font-extrabold">{submissions.find(f => f.id === activeSubmissionId)?.film_title || ''}</span>
+              <h2 className="text-2xl md:text-3xl font-extrabold text-left mb-2 text-white tracking-tight">
+                Onboarding of <span className="bg-gradient-to-r from-tiketx-blue via-tiketx-violet to-tiketx-pink bg-clip-text text-transparent font-extrabold drop-shadow-lg">{submissions.find(f => f.id === activeSubmissionId)?.film_title || ''}</span>
               </h2>
-              <div className="text-sm text-gray-400 text-center mb-5">Please complete the onboarding steps below to proceed.</div>
-              <div className="flex flex-col gap-2 mb-5">
-                <div className="text-base font-semibold text-white mb-2">Onboarding checklist</div>
-                {onboardingSteps.length === 0 ? (
-                  <div className="text-gray-400 text-center">No onboarding instructions provided for this film.</div>
-                ) : (
-                  onboardingSteps.map((step, idx) => (
-                    <div key={step.id} className="flex items-center gap-3 py-1">
-                      <button
-                        type="button"
-                        onClick={() => handleStepComplete(idx)}
-                        aria-label={step.label}
-                        className={`w-6 h-6 flex items-center justify-center rounded-full border-2 transition-colors duration-200 focus:outline-none ${step.completed ? 'border-green-500 bg-green-500' : 'border-gray-400 bg-black'}`}
-                      >
-                        {step.completed ? (
-                          <svg className="w-4 h-4" fill="none" stroke="white" strokeWidth="3" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                        ) : (
-                          <svg className="w-4 h-4" fill="none" stroke="#888" strokeWidth="3" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /></svg>
-                        )}
-                      </button>
-                      <span className="text-sm text-gray-200 font-medium">{step.label}</span>
-                    </div>
-                  ))
-                )}
-              </div>
-              <div className="mb-4">
-                <label htmlFor="driveLink" className="block font-medium mb-2 text-gray-200 text-sm">Google Drive Private Link</label>
-                <input
-                  id="driveLink"
-                  type="url"
-                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-tiketx-blue bg-black bg-opacity-40 text-white placeholder-gray-400 border-gray-700 text-sm"
-                  placeholder="Paste your Google Drive private link here"
-                  value={driveLink}
-                  onChange={e => setDriveLink(e.target.value)}
-                />
-              </div>
-              <div className="w-full border-t border-gray-700 my-6"></div>
-              <div className="mb-6">
-                <div className="text-base font-semibold text-white mb-2">Payment Information</div>
-                <div className="text-xs text-gray-400 font-medium">
-                  An onboarding fee of Rs. 2000 is required. If your film is not released, rejected, or withdrawn, this fee will be refunded.
+              <div className="text-base text-gray-400 text-left mb-8 font-light">Please complete the onboarding steps below to proceed.</div>
+              <div className="mb-8">
+                <div className="bg-[#23232a] bg-opacity-90 rounded-2xl p-8 flex flex-col gap-4 shadow-md border border-gray-800">
+                  <div className="text-lg font-bold text-white mb-2 tracking-tight">Onboarding checklist</div>
+                  {onboardingSteps.length === 0 ? (
+                    <div className="text-gray-400 text-center">No onboarding instructions provided for this film.</div>
+                  ) : (
+                    onboardingSteps.map((step, idx) => (
+                      <div key={step.id} className="flex items-center gap-4 py-2">
+                        <button
+                          type="button"
+                          onClick={() => handleStepComplete(idx)}
+                          aria-label={step.label}
+                          className={`w-7 h-7 flex items-center justify-center rounded-full border-2 transition-colors duration-200 focus:outline-none shadow-sm ${step.completed ? 'border-green-500 bg-green-500' : 'border-gray-500 bg-gray-800 hover:border-tiketx-blue hover:bg-gray-700'}`}
+                        >
+                          {step.completed ? (
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24">
+                              <circle cx="12" cy="12" r="10" fill="#22c55e" stroke="#fff" strokeWidth="2" />
+                              <polyline points="7,12 11,16 17,9" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          ) : (
+                            <svg className="w-5 h-5" fill="none" stroke="#888" strokeWidth="3" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /></svg>
+                          )}
+                        </button>
+                        <span className="text-base text-gray-100 font-medium leading-snug tracking-tight">{step.label}</span>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
-              <div className="flex items-center mb-6">
+              <div className="mb-6">
+                <label htmlFor="driveLink" className="block font-semibold mb-2 text-gray-200 text-base tracking-tight">Google Drive Private Link</label>
+                <div className="flex items-center gap-3">
+                  <input
+                    id="driveLink"
+                    type="url"
+                    className="w-full px-5 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-tiketx-blue bg-gray-800 text-white placeholder-gray-400 border-gray-700 text-base font-medium tracking-tight"
+                    placeholder="Paste your Google Drive private link here"
+                    value={driveLink}
+                    onChange={e => setDriveLink(e.target.value)}
+                  />
+                  <img src="/google-drive-logo.png" alt="Google Drive" className="w-8 h-8 drop-shadow" />
+                </div>
+              </div>
+              <div className="w-full border-t border-gray-700 my-8"></div>
+              <div className="mb-8">
+                <div className="text-lg font-bold text-white mb-2 tracking-tight">Payment Information</div>
+                <div className="text-sm text-gray-400 font-medium leading-relaxed">
+                  An onboarding fee of <span className="font-bold text-white">Rs. 2000</span> is required. If your film is not released, rejected, or withdrawn, this fee will be refunded.
+                </div>
+              </div>
+              <div className="flex items-center mb-8">
                 <input
                   id="acceptTerms"
                   type="checkbox"
                   checked={acceptTerms}
                   onChange={e => setAcceptTerms(e.target.checked)}
-                  className="mr-3 accent-tiketx-blue w-4 h-4"
+                  className="mr-3 accent-tiketx-blue w-5 h-5"
                 />
-                <label htmlFor="acceptTerms" className="text-sm text-gray-200">I accept the <a href="/terms" target="_blank" className="underline text-tiketx-blue">terms and conditions</a></label>
+                <label htmlFor="acceptTerms" className="text-base text-gray-200 font-medium">I accept the <a href="/terms" target="_blank" className="underline text-tiketx-blue">terms and conditions</a></label>
               </div>
               <button
-                className="w-full px-4 py-3 bg-gradient-to-r from-tiketx-blue to-tiketx-pink hover:from-tiketx-violet hover:to-tiketx-pink rounded-xl font-semibold text-white text-base transition-all duration-200 hover:scale-105 shadow-lg disabled:opacity-50"
+                className="w-full px-6 py-4 bg-gradient-to-r from-tiketx-blue to-tiketx-pink hover:from-tiketx-violet hover:to-tiketx-pink rounded-2xl font-bold text-white text-lg transition-all duration-200 hover:scale-105 shadow-xl disabled:opacity-50 tracking-tight flex items-center justify-center gap-2"
                 onClick={handleSubmitOnboarding}
                 disabled={
                   !acceptTerms || !driveLink || onboardingSteps.length === 0 || !onboardingSteps.every(s => s.completed)
                 }
               >
-                Submit & Pay
+                <span>Submit & Pay</span>
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="7" y="11" width="10" height="7" rx="2" stroke="currentColor"/><path d="M12 15v2" stroke="currentColor" strokeLinecap="round"/><path d="M9 11V7a3 3 0 1 1 6 0v4" stroke="currentColor"/></svg>
               </button>
             </div>
           </div>
