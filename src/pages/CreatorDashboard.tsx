@@ -12,6 +12,7 @@ type Submission = {
   onboarding_fee_paid_datetime?: string;
   drive_link?: string;
   agreed_terms?: boolean;
+  submission_rejection_reason?: string;
 };
 import UploadDocsModal from "@/components/UploadDocsModal";
 import { openRazorpayModal } from "@/lib/razorpay";
@@ -65,6 +66,8 @@ import { useNavigate } from 'react-router-dom';
 import { CheckCircle, Clock, Search, TrendingUp, Flag, ArrowRight, Calendar, FileText, Eye } from 'lucide-react';
 
 function CreatorDashboard() {
+  // State for rejection reason popup
+  const [showRejectionReason, setShowRejectionReason] = useState<{ open: boolean; reason: string }>({ open: false, reason: "" });
   const { toast } = useToast();
   const navigate = useNavigate();
   const [authChecking, setAuthChecking] = useState(true);
@@ -159,6 +162,21 @@ function CreatorDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white">
+      {/* Rejection Reason Popup */}
+      {showRejectionReason.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-gray-900 rounded-2xl p-6 shadow-2xl max-w-sm w-full border border-red-400/30">
+            <h3 className="text-lg font-bold text-red-300 mb-2">Submission Rejection Reason</h3>
+            <p className="text-sm text-gray-200 mb-4 whitespace-pre-line">{showRejectionReason.reason}</p>
+            <button
+              className="px-4 py-2 rounded-lg bg-red-700 text-white font-bold shadow hover:bg-red-600 transition"
+              onClick={() => setShowRejectionReason({ open: false, reason: "" })}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
       <div className="max-w-7xl mx-auto px-4 md:px-8 py-12">
         {/* Header Section */}
         <div className="text-center mb-20">
@@ -233,6 +251,26 @@ function CreatorDashboard() {
                             )}
                           </div>
                         </div>
+                        <button
+                          className="flex items-center gap-2 px-6 py-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-2xl transition-all duration-200 group-hover:scale-105 mr-6"
+                          onClick={async () => {
+                            setLoading(true);
+                            const { data: rows, error } = await supabase
+                              .from('film_submissions')
+                              .select('id, film_title, synopsis, submitted_at, status_stage, onboarding_instructions, onboarding_fee, onboarding_fee_paid, onboarding_fee_paid_datetime, drive_link, agreed_terms')
+                              .eq('user_id', user.id)
+                              .order('submitted_at', { ascending: false });
+                            if (error) {
+                              toast({ title: 'Failed to refresh submissions', variant: 'destructive' });
+                            } else {
+                              setSubmissions((rows as any) || []);
+                            }
+                            setLoading(false);
+                          }}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.06-.27 2.06-.75 2.93l1.46 1.46A7.963 7.963 0 0020 12c0-4.42-3.58-8-8-8zm-6.75 3.07l-1.46-1.46A7.963 7.963 0 004 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3c-3.31 0-6-2.69-6-6 0-1.06.27-2.06.75-2.93z" fill="currentColor"/></svg>
+                          Refresh
+                        </button>
                         <button className="flex items-center gap-2 px-6 py-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-2xl transition-all duration-200 group-hover:scale-105" onClick={async () => {
                           setViewLoading(true);
                           setViewModalOpen(true);
@@ -256,15 +294,40 @@ function CreatorDashboard() {
                           return (
                             <div key={stage.key} className="relative flex flex-col flex-1 min-w-0 max-w-xs mx-2">
                               <div className="flex flex-col items-center flex-1">
-                                <div className={"relative z-10 w-16 h-16 rounded-2xl flex items-center justify-center mb-4 transition-all duration-300 " + (isCompleted ? "bg-green-500 shadow-lg" : isActive ? "bg-gradient-to-r from-tiketx-blue to-tiketx-violet shadow-lg" : "bg-white/10 border-2 border-white/20") }>
-                                  <IconComponent className={`w-8 h-8 ${isCompleted ? 'text-white' : isActive ? 'text-white' : 'text-gray-400'}`} />
+                                <div className={
+                                  "relative z-10 w-16 h-16 rounded-2xl flex items-center justify-center mb-4 transition-all duration-300 " +
+                                  (s.status_stage === "submission_rejected" && stage.key === "submission"
+                                    ? "bg-gradient-to-br from-red-500/30 via-red-400/20 to-red-300/20 shadow-lg"
+                                    : isCompleted
+                                    ? "bg-green-500 shadow-lg"
+                                    : isActive
+                                    ? "bg-gradient-to-r from-tiketx-blue to-tiketx-violet shadow-lg"
+                                    : "bg-white/10 border-2 border-white/20")
+                                }>
+                                  {s.status_stage === "submission_rejected" && stage.key === "submission" && (
+                                    <span className="absolute -top-1.5 -right-1.5 w-6 h-6 flex items-center justify-center rounded-full bg-red-500 shadow-lg">
+                                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <text x="8" y="12" textAnchor="middle" fontSize="12" fill="#fff" fontWeight="bold">!</text>
+                                      </svg>
+                                    </span>
+                                  )}
+                                  <IconComponent className={`w-8 h-8 ${isCompleted || (s.status_stage === 'submission_rejected' && stage.key === 'submission') ? 'text-white' : isActive ? 'text-white' : 'text-gray-400'}`} />
                                   {isCompleted && (<div className="absolute -top-1 -right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center"><CheckCircle className="w-4 h-4 text-white" /></div>)}
                                   {isActive && (<div className="absolute -top-1 -right-1 w-6 h-6 bg-tiketx-blue rounded-full flex items-center justify-center"><Clock className="w-4 h-4 text-white" /></div>)}
                                 </div>
-                                <div className={"w-full h-full min-h-[200px] p-6 rounded-2xl border transition-all duration-300 hover:scale-105 flex flex-col " + (isCompleted ? "bg-white/10 border-white/20 shadow-lg" : isActive ? "bg-gradient-to-br from-tiketx-blue/20 to-tiketx-violet/20 border-tiketx-blue/50 shadow-lg shadow-tiketx-blue/10" : "bg-white/5 border-white/10") }>
+                                <div className={
+                                  "w-full h-full min-h-[200px] p-6 rounded-2xl border transition-all duration-300 hover:scale-105 flex flex-col " +
+                                  (s.status_stage === "submission_rejected" && stage.key === "submission"
+                                    ? "bg-gradient-to-br from-red-500/20 via-red-400/12 to-red-300/12 border-red-400/30 shadow-lg"
+                                    : isCompleted
+                                    ? "bg-white/10 border-white/20 shadow-lg"
+                                    : isActive
+                                    ? "bg-gradient-to-br from-tiketx-blue/20 to-tiketx-violet/20 border-tiketx-blue/50 shadow-lg shadow-tiketx-blue/10"
+                                    : "bg-white/5 border-white/10")
+                                }>
                                   <div className="text-center flex flex-col h-full">
-                                    <h3 className={`${isCompleted || isActive ? "text-white" : "text-gray-400"} font-bold text-lg mb-2`}>{stage.label}</h3>
-                                    <p className={`text-sm leading-relaxed mb-4 flex-1 ${isCompleted || isActive ? "text-gray-200" : "text-gray-500"}`}>{stage.description}</p>
+                                    <h3 className={`${isCompleted || isActive || (s.status_stage === "submission_rejected" && stage.key === "submission") ? "text-white" : "text-gray-400"} font-bold text-lg mb-2`}>{stage.label}</h3>
+                                    <p className={`text-sm leading-relaxed mb-4 flex-1 ${isCompleted || isActive || (s.status_stage === "submission_rejected" && stage.key === "submission") ? "text-gray-200" : "text-gray-500"}`}>{stage.description}</p>
                                     <div className="flex justify-center mb-4">
                                       {stage.key === "submission" && (
                                         s.status_stage === "submission" ? (
@@ -273,6 +336,26 @@ function CreatorDashboard() {
                                           <span className="px-3 py-1 bg-blue-900/60 text-blue-200 rounded-full text-xs font-semibold border border-blue-300/30">In Review</span>
                                         ) : s.status_stage === "onboarding" ? (
                                           <span className="px-3 py-1 bg-green-900/60 text-green-300 rounded-full text-xs font-semibold border border-green-300/30">Submission Accepted</span>
+                                        ) : s.status_stage === "submission_rejected" ? (
+                                          <div className="flex flex-col items-center gap-2 justify-center">
+                                            <span className="px-3 py-1 bg-red-900/60 text-red-300 rounded-full text-xs font-semibold border border-red-300/30">Submission Rejected</span>
+                                            <button
+                                              className="flex items-center gap-1 px-2 py-0.5 text-xs rounded bg-transparent text-red-300 font-semibold underline hover:text-red-400 transition"
+                                              style={{ minHeight: 'auto', minWidth: 'auto' }}
+                                              onClick={async (e) => {
+                                                e.preventDefault();
+                                                const { data } = await supabase
+                                                  .from('film_submissions')
+                                                  .select('submission_rejection_reason')
+                                                  .eq('id', s.id)
+                                                  .single();
+                                                setShowRejectionReason({ open: true, reason: data?.submission_rejection_reason || "No reason provided." });
+                                              }}
+                                              type="button"
+                                            >
+                                              <span>See Why?</span>
+                                            </button>
+                                          </div>
                                         ) : (
                                           <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-xs font-semibold border border-green-500/30">Completed</span>
                                         )

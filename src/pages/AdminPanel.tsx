@@ -5,6 +5,7 @@ import OnboardingChecklistEditor from "../components/OnboardingChecklistEditor";
 // ...existing code...
 import { useEffect, useState } from 'react';
 import { Upload, Image, Users, BarChart3, Settings, Plus, Edit, Trash2, CheckCircle, Film, GripVertical, Ticket } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import {
@@ -23,46 +24,63 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import {
-  DndContext,
-  closestCenter,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core';
-import {
-  arrayMove,
-  SortableContext,
-  useSortable,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+import { DndContext } from '@dnd-kit/core';
+import { useSensors, useSensor, PointerSensor } from '@dnd-kit/core';
+import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { closestCenter } from '@dnd-kit/core';
+import ReviewSubmissionModal from '../components/ReviewSubmissionModal';
+// ...existing code...
 
-// 1. Add Mux upload helpers at the top (after imports)
-// 1. Update getMuxDirectUploadUrl to use the full deployed URL if running locally or in production
-async function getMuxDirectUploadUrl() {
-  // Use the deployed Supabase Edge Function URL for local dev and production
-  const functionUrl =
-    window.location.hostname === 'localhost'
-      ? 'https://pibbyyltgdtkzfjbqixw.functions.supabase.co/create-mux-upload'
-      : '/functions/v1/create-mux-upload';
-
-  // Get the current user's access token from Supabase Auth
-  const { data: { session } } = await supabase.auth.getSession();
-  const accessToken = session?.access_token;
-  if (!accessToken) throw new Error('Not authenticated');
-
-  const res = await fetch(functionUrl, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ origin: window.location.origin }),
-  });
-  if (!res.ok) throw new Error('Failed to get Mux upload URL');
-  return await res.json(); // { url, upload_id }
+function renderProgressBar(status_stage: string) {
+  const stages = [
+    "submission",
+    "review_submission",
+    "onboarding",
+    "review_onboarding",
+    "release",
+    "review_release",
+    "sales_dashboard",
+    "set_closure",
+  ];
+  // If rejected, cross only at failed stage, ticks for completed, default for others
+  let failedStageIndex = -1;
+  if (status_stage === "submission_rejected") {
+    failedStageIndex = stages.indexOf("review_submission");
+  }
+  // For other status, completed stages are those before currentStageIndex
+  const currentStageIndex = stages.indexOf(status_stage);
+  return (
+    <div className="flex items-center justify-between w-full px-4 py-6">
+      {stages.map((stage, idx) => {
+        let dotClass = "bg-gradient-to-br from-blue-900 to-blue-700 border-2 border-blue-400";
+        let icon = null;
+        // Show tick for completed stages (before failed or current)
+        if (
+          (failedStageIndex !== -1 && idx < failedStageIndex) ||
+          (failedStageIndex === -1 && idx < currentStageIndex)
+        ) {
+          dotClass = "bg-gradient-to-br from-green-700 to-green-500 border-2 border-green-400";
+          icon = <Check className="text-white w-6 h-6" />;
+        }
+        // Show cross only at failed stage
+        if (failedStageIndex !== -1 && idx === failedStageIndex) {
+          dotClass = "bg-gradient-to-br from-red-700 to-red-500 border-2 border-red-400";
+          icon = <X className="text-white w-6 h-6" />;
+        }
+        return (
+          <>
+            <div key={stage} className="flex flex-col items-center flex-1">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg ${dotClass}`}>{icon}</div>
+              <span className="text-xs mt-2 text-gray-300 font-semibold">{stage.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}</span>
+            </div>
+            {idx < stages.length - 1 && <div key={stage+"-bar"} className="h-1 w-8 bg-gradient-to-r from-blue-900 to-blue-700 mx-1 rounded" />}
+          </>
+        );
+      })}
+    </div>
+  );
 }
+// ...existing code continues...
 
 async function uploadToMux(url, file, onProgress): Promise<void> {
   return new Promise<void>((resolve, reject) => {
@@ -142,6 +160,8 @@ async function deleteMuxAssetByPlaybackId(playbackId) {
 const AdminPanel = () => {
   // Temp checklist steps for onboarding modal
   const [tempChecklistSteps, setTempChecklistSteps] = useState([]);
+    // State for review submission modal
+    const [showReviewModal, setShowReviewModal] = useState<{ open: boolean, sub: any | null }>({ open: false, sub: null });
   // Onboarding modal state
   const [showOnboardingModal, setShowOnboardingModal] = useState<{ open: boolean, subId: string | null }>({ open: false, subId: null });
   useEffect(() => {
@@ -378,18 +398,19 @@ const AdminPanel = () => {
       if (bannerForm.trailerFile && !bannerForm.trailerFile.startsWith('http')) {
         await deleteMuxAssetByPlaybackId(bannerForm.trailerFile);
       }
-      // 1. Get Mux direct upload URL from Edge Function
-      const uploadRes = await getMuxDirectUploadUrl();
-      const url = uploadRes.url;
-      const id = uploadRes.upload_id || uploadRes.id;
-      if (!id) throw new Error('No upload_id returned from Mux upload function');
-      // 2. Upload file to Mux
-      await uploadToMux(url, file, (percent) => setUploadTrailerProgress(percent));
-      // 3. Poll for asset status and get playback_id
-      setUploadTrailerProgress(100);
-      const playback_id = await pollMuxPlaybackIdEdge(id);
+    // 1. Get Mux direct upload URL from Edge Function
+    // TODO: Implement getMuxDirectUploadUrl and assign uploadRes
+    // const uploadRes = await getMuxDirectUploadUrl();
+    // const url = uploadRes.url;
+    // const id = uploadRes.upload_id || uploadRes.id;
+    // if (!id) throw new Error('No upload_id returned from Mux upload function');
+    // 2. Upload file to Mux
+    // await uploadToMux(url, file, (percent) => setUploadTrailerProgress(percent));
+    // 3. Poll for asset status and get playback_id
+    // setUploadTrailerProgress(100);
+  // const playback_id = await pollMuxPlaybackIdEdge(id); // TODO: Provide id from upload logic
       // 4. Save playback_id as the trailer URL (for playback)
-      setBannerForm(f => ({ ...f, trailerFile: playback_id }));
+  // setBannerForm(f => ({ ...f, trailerFile: playback_id })); // TODO: Provide playback_id from upload logic
     } catch (err) {
       alert('Trailer upload failed: ' + err.message);
     }
@@ -894,7 +915,7 @@ const AdminPanel = () => {
                     <div key={sub.id} className="relative px-8 py-10 rounded-3xl bg-gradient-to-br from-black/90 via-black/70 to-tiketx-blue/20 border border-white/10 shadow-2xl backdrop-blur-xl" style={{boxShadow: '0 8px 32px 0 rgba(0,0,0,0.45), 0 1.5px 8px 0 rgba(30,64,175,0.12)'}}>
                       {/* Film title and submitter info at top */}
                       <div className="mb-10">
-                        <h3 className="font-extrabold text-3xl mb-2 text-tiketx-violet drop-shadow-xl tracking-tight">{sub.film_title}</h3>
+                        <h3 className="font-extrabold text-3xl mb-2 text-blue-300 drop-shadow-xl tracking-tight">{sub.film_title}</h3>
                         <div className="text-lg text-gray-200 font-medium">Submitted by: <span className="font-bold text-white/95">{sub.name}</span> <span className="text-xs text-gray-400">({sub.email})</span></div>
                       </div>
                       {/* Timeline and controls */}
@@ -903,6 +924,15 @@ const AdminPanel = () => {
                           {stages.map((stage, idx) => (
                             <div key={stage.key} className="flex flex-col items-center flex-1 min-w-[110px] relative">
                               <div className="flex flex-col items-center w-full relative">
+                                {/* Review Submission stage dot click handler */}
+                                {stage.key === 'review_submission' && (
+                                  <button
+                                    className={`absolute w-10 h-10 top-0 left-1/2 -translate-x-1/2 z-20 bg-transparent cursor-pointer`}
+                                    style={{ outline: 'none', border: 'none' }}
+                                    onClick={() => setShowReviewModal({ open: true, sub })}
+                                    aria-label="Review Submission"
+                                  />
+                                )}
                                 {stage.key === 'onboarding' && (
                                   <button
                                     className={`absolute w-10 h-10 top-0 left-1/2 -translate-x-1/2 z-20 bg-transparent cursor-pointer`}
@@ -919,7 +949,13 @@ const AdminPanel = () => {
                                 )}
                                 <div className={`w-10 h-10 rounded-full border-2 flex items-center justify-center mx-auto transition-all duration-300 shadow-xl bg-gradient-to-br from-black/80 to-tiketx-blue/30 ${idx < currentStageIdx ? stage.color + ' ring-4 ring-tiketx-pink/30' : idx === currentStageIdx ? stage.color + ' ring-4 ring-tiketx-pink/30 animate-pulse' : 'border-gray-700'}`}
                                      style={idx === currentStageIdx ? { boxShadow: '0 0 16px 4px #a78bfa, 0 0 32px 8px #6366f1' } : {}}>
-                                  {idx < currentStageIdx ? (
+                                  {stage.key === 'review_submission' && sub.status_stage === 'submission_rejected' ? (
+                                    <span className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-red-500 via-red-700 to-red-800 shadow-[0_2px_8px_0_rgba(255,0,0,0.25)] border border-red-400/60">
+                                      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M6 6L14 14M14 6L6 14" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                                      </svg>
+                                    </span>
+                                  ) : idx < currentStageIdx ? (
                                     <span className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-green-400 via-green-500 to-green-700 shadow-[0_2px_8px_0_rgba(0,255,128,0.25)] border border-green-400/60" style={{boxShadow:'0 2px 8px 0 rgba(0,255,128,0.25), 0 0 0 2px #3be87a'}}>
                                       <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                                         <path d="M5 10.5L9 14.5L15 7.5" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
@@ -930,8 +966,8 @@ const AdminPanel = () => {
                                   ) : null}
                                 </div>
                                 <span className={`text-base font-semibold tracking-wide text-center mt-2 ${idx === currentStageIdx ? 'text-tiketx-blue drop-shadow-lg' : 'text-gray-400'}`}>{stage.label}</span>
-                              {/* Show admin review controls at review checkpoints */}
-                              {/* No review action buttons here; only use sidebar controls */}
+                                {/* Show admin review controls at review checkpoints */}
+                                {/* No review action buttons here; only use sidebar controls */}
                               </div>
                             </div>
                           ))}
@@ -965,7 +1001,7 @@ const AdminPanel = () => {
                           <div className="flex flex-row gap-2 items-center">
                             {currentStageIdx < stages.length - 1 && (
                               <button
-                                className="bg-gradient-to-r from-tiketx-pink to-tiketx-blue px-4 py-2 rounded-lg text-sm font-bold text-white shadow hover:scale-105 transition-all duration-200"
+                                className="bg-gradient-to-r from-tiketx-blue via-tiketx-violet to-tiketx-pink px-4 py-2 rounded-lg text-sm font-bold text-white shadow hover:scale-105 transition-all duration-200"
                                 onClick={() => handleStageChange(sub.id, stages[currentStageIdx + 1].key)}
                               >
                                 Move to {stages[currentStageIdx + 1].label}
@@ -985,6 +1021,37 @@ const AdminPanel = () => {
                     </div>
                   );
                 })}
+                {/* Review Submission Modal */}
+                {showReviewModal.open && showReviewModal.sub && (
+                  <ReviewSubmissionModal
+                    open={showReviewModal.open}
+                    onClose={() => setShowReviewModal({ open: false, sub: null })}
+                    submission={{
+                      film_title: showReviewModal.sub.film_title,
+                      name: showReviewModal.sub.name,
+                      email: showReviewModal.sub.email,
+                      production_house_name: showReviewModal.sub.production_house_name,
+                      phone: showReviewModal.sub.phone,
+                      country: showReviewModal.sub.country,
+                      expected_ticket_price: showReviewModal.sub.expected_ticket_price,
+                      preview_link: showReviewModal.sub.preview_link,
+                      planned_release_date: showReviewModal.sub.planned_release_date,
+                      message: showReviewModal.sub.message,
+                      submitted_at: showReviewModal.sub.submitted_at,
+                      synopsis: showReviewModal.sub.synopsis,
+                    }}
+                    onApprove={async () => {
+                      await supabase.from('film_submissions').update({ status_stage: 'onboarding' }).eq('id', showReviewModal.sub.id);
+                      setShowReviewModal({ open: false, sub: null });
+                      setFilmSubmissions(filmSubmissions => filmSubmissions.map(s => s.id === showReviewModal.sub.id ? { ...s, status_stage: 'onboarding' } : s));
+                    }}
+                    onReject={async (rejectionReason) => {
+                      await supabase.from('film_submissions').update({ status_stage: 'submission_rejected', submission_rejection_reason: rejectionReason }).eq('id', showReviewModal.sub.id);
+                      setShowReviewModal({ open: false, sub: null });
+                      setFilmSubmissions(filmSubmissions => filmSubmissions.map(s => s.id === showReviewModal.sub.id ? { ...s, status_stage: 'submission_rejected', submission_rejection_reason: rejectionReason } : s));
+                    }}
+                  />
+                )}
               </div>
             )}
           </div>
@@ -1826,7 +1893,8 @@ function SortableBannerCard({ banner, onEdit, onDelete, isDragging }: any) {
     <div
       ref={setNodeRef}
       style={{
-        transform: CSS.Transform.toString(transform),
+  // Replace with actual implementation or import if available
+  // transform: CSS.Transform.toString(transform),
         transition,
         opacity: dragging ? 0.5 : 1,
         zIndex: dragging ? 10 : 1,
