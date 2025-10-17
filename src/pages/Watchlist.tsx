@@ -25,11 +25,14 @@ const Watchlist = () => {
         setLoading(false);
         return;
       }
-      // Fetch watchlist films
+      // Fetch watchlist films (only visible ones)
+      const currentTime = new Date().toISOString();
       const { data: watchlistData, error: watchlistError } = await supabase
         .from('user_watchlist')
-        .select('film_id, films:film_id(*)')
+        .select('film_id, films:film_id!inner(*)')
         .eq('user_id', userObj.id)
+        .eq('films.is_published', true)
+        .or(`films.scheduled_release_datetime.is.null,films.scheduled_release_datetime.lte.${currentTime}`)
         .order('created_at', { ascending: false });
       // Fetch tickets
       const { data: ticketsData, error: ticketsError } = await supabase

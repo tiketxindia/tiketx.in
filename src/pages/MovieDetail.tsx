@@ -66,13 +66,22 @@ const MovieDetail = () => {
   useEffect(() => {
     if (!id) return;
     setLoading(true);
+    const currentTime = new Date().toISOString();
+    
     supabase
       .from('films')
       .select('*')
       .eq('id', id)
+      .eq('is_published', true)
+      .or(`scheduled_release_datetime.is.null,scheduled_release_datetime.lte.${currentTime}`)
       .single()
-      .then(({ data }) => {
-        setFilm(data);
+      .then(({ data, error }) => {
+        if (error || !data) {
+          // Film not found or not visible - redirect to 404
+          setFilm(null);
+        } else {
+          setFilm(data);
+        }
         setLoading(false);
       });
     // Fetch cast and crew
@@ -113,10 +122,14 @@ const MovieDetail = () => {
       controls: 1, // Show native controls (progress bar, play/pause, etc.)
       modestbranding: 1, // Hide YouTube logo
       rel: 0, // Don't show related videos at the end
-      showinfo: 0,
+      showinfo: 0, // Hide video title and uploader info
       fs: 1, // Allow fullscreen
       iv_load_policy: 3, // Hide video annotations
       disablekb: 0, // Allow keyboard controls
+      cc_load_policy: 0, // Hide closed captions by default
+      origin: window.location.origin, // Better security and removes some branding
+      enablejsapi: 1, // Enable JavaScript API for better control
+      playsinline: 1, // Play inline on mobile
     },
   };
 
@@ -197,16 +210,28 @@ const MovieDetail = () => {
       {/* Hero Banner / Trailer */}
       <div className="relative mb-6">
         <div className="h-[300px] md:h-[400px] relative overflow-hidden rounded-2xl mx-6 group">
-          {/* Background Image */}
-          <img
-            src={film.film_thumbnail_horizontal}
-            alt={film.title}
-            className="w-full h-full object-cover"
-          />
-          {/* Dark overlay for dimming */}
-          <div className="absolute inset-0 bg-black" style={{ opacity: 0.7 }} />
+          {/* Background Image - only show when not playing trailer */}
+          {!playingTrailer && (
+            <>
+              <img
+                src={film.film_thumbnail_horizontal}
+                alt={film.title}
+                className="w-full h-full object-cover"
+              />
+              {/* Dark overlay for dimming */}
+              <div className="absolute inset-0 bg-black" style={{ opacity: 0.7 }} />
+            </>
+          )}
+          
           {/* Watch Trailer Button */}
-          {!playingTrailer || !trailerId ? (
+          {!trailerId || !film.is_trailer_enabled ? (
+            <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 2 }}>
+              <span className="bg-gray-600/80 flex items-center space-x-2 text-lg px-8 py-4 font-bold rounded-xl text-gray-300">
+                <Play size={24} />
+                Trailer Not Available
+              </span>
+            </div>
+          ) : !playingTrailer ? (
             <button
               className="absolute inset-0 flex items-center justify-center"
               style={{ zIndex: 2 }}
@@ -218,7 +243,7 @@ const MovieDetail = () => {
               </span>
             </button>
           ) : (
-            <div className="w-full h-full relative">
+            <div className="w-full h-full relative youtube-player-container">
               <YouTube
                 videoId={trailerId}
                 opts={ytOpts}
@@ -291,7 +316,7 @@ const MovieDetail = () => {
         {film.film_playback_id && (
           <div className="mt-8">
             <h3 className="text-lg font-semibold mb-3">Watch Film</h3>
-            <div className="flex items-center bg-gray-800 rounded-xl p-4 text-white gap-4 relative">
+            <div className="flex items-center bg-black/40 backdrop-blur-lg border border-white/20 rounded-xl p-4 text-white gap-4 relative shadow-2xl">
               <div className="relative">
                 <img
                   src={film.film_thumbnail_vertical}

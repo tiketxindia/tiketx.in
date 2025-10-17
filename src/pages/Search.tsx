@@ -14,10 +14,17 @@ const Search = () => {
 
   useEffect(() => {
     setFilmsLoading(true);
-    supabase.from('films').select('*').then(({ data, error }) => {
-      if (!error && data) setFilms(data);
-      setFilmsLoading(false);
-    });
+    const currentTime = new Date().toISOString();
+    
+    supabase
+      .from('films')
+      .select('*')
+      .eq('is_published', true)
+      .or(`scheduled_release_datetime.is.null,scheduled_release_datetime.lte.${currentTime}`)
+      .then(({ data, error }) => {
+        if (!error && data) setFilms(data);
+        setFilmsLoading(false);
+      });
   }, []);
 
   // Audio search setup

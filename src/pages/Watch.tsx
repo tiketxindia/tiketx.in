@@ -29,9 +29,16 @@ const Watch = () => {
       setError(null);
       if (!id) return;
       // 1. Fetch film details
-      const { data: filmData, error: filmError } = await supabase.from('films').select('*').eq('id', id).single();
+      const currentTime = new Date().toISOString();
+      const { data: filmData, error: filmError } = await supabase
+        .from('films')
+        .select('*')
+        .eq('id', id)
+        .eq('is_published', true)
+        .or(`scheduled_release_datetime.is.null,scheduled_release_datetime.lte.${currentTime}`)
+        .single();
       if (filmError || !filmData) {
-        setError('Film not found');
+        setError('Film not found or not available yet');
         setLoading(false);
         return;
       }

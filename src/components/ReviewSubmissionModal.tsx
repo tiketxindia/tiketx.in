@@ -17,6 +17,7 @@ interface ReviewSubmissionModalProps {
     message: string;
     submitted_at: string;
     synopsis: string;
+    submission_rejection_reason?: string;
   };
   onApprove: () => void;
   onReject: (reason: string) => void;
@@ -40,6 +41,10 @@ const ReviewSubmissionModal: React.FC<ReviewSubmissionModalProps> = ({
           Review Film Submission
         </h2>
         <div className="mb-8">
+          <div className="mb-4">
+            <span className="font-semibold text-red-300">Previous Rejection Reason:&nbsp;</span>
+            <span className="italic text-red-200">{submission?.submission_rejection_reason ? submission.submission_rejection_reason : 'No'}</span>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-2">

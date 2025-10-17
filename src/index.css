@@ -55,11 +55,13 @@ All colors MUST be HSL.
 
 @layer base {
   * {
-    @apply border-border;
+    border-color: hsl(var(--border));
   }
 
   body {
-    @apply bg-black text-foreground font-sans;
+    background-color: #000000;
+    color: hsl(var(--foreground));
+    font-family: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
     background: linear-gradient(135deg, #000000 0%, #0a0a0a 50%, #111111 100%);
     min-height: 100vh;
   }
@@ -75,21 +77,44 @@ body{
 
 @layer components {
   .gradient-button {
-    @apply bg-tiketx-gradient hover:bg-tiketx-gradient-hover text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl;
+    background: linear-gradient(135deg, #3ABDFE 0%, #8B5FBF 50%, #FF7D52 100%);
+    color: white;
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.75rem;
+    transition: all 0.3s ease;
+    transform: scale(1);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  }
+  
+  .gradient-button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 25px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   }
   
   .glass-card {
-    @apply bg-black/40 backdrop-blur-lg border border-white/20 rounded-xl shadow-2xl;
+    background-color: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 0.75rem;
+    box-shadow: 0 25px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   }
   
   .movie-card {
-    @apply glass-card p-3 transition-all duration-300 cursor-pointer;
+    background-color: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 0.75rem;
+    box-shadow: 0 25px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    padding: 0.75rem;
+    transition: all 0.3s ease;
+    cursor: pointer;
   }
 
   /* Enhanced movie card hover effects with proper scaling */
   .movie-card:hover {
-    @apply transform scale-105 shadow-2xl;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+    transform: scale(1.05);
+    box-shadow: 0 25px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04), 0 20px 40px rgba(0, 0, 0, 0.6);
     z-index: 20;
   }
 
@@ -101,7 +126,11 @@ body{
   }
 
   .hero-card {
-    @apply bg-black/50 backdrop-blur-sm border border-white/30 rounded-2xl shadow-2xl;
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 1rem;
+    box-shadow: 0 25px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   }
 
   .scrollbar-hide {
@@ -114,7 +143,20 @@ body{
   }
 
   .hotstar-hover-card {
-    @apply absolute z-50 bg-black/95 backdrop-blur-lg border border-white/30 rounded-xl p-4 shadow-2xl transform transition-all duration-300 scale-95 hover:scale-100;
+    position: absolute;
+    z-index: 50;
+    background-color: rgba(0, 0, 0, 0.95);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 0.75rem;
+    padding: 1rem;
+    box-shadow: 0 25px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    transform: scale(0.95);
+    transition: all 0.3s ease;
+  }
+  
+  .hotstar-hover-card:hover {
+    transform: scale(1);
   }
 
   /* Ensure hover details appear above other content */
@@ -208,4 +250,27 @@ body{
   background: #000; /* pure black */
   border-radius: 50%;
   z-index: 2;
+}
+
+/* YouTube Player Customization */
+.youtube-player-container iframe {
+  border-radius: 1rem;
+}
+
+/* Hide YouTube branding and overlays */
+.youtube-player-container .ytp-chrome-top,
+.youtube-player-container .ytp-title,
+.youtube-player-container .ytp-show-cards-title,
+.youtube-player-container .ytp-cards-teaser,
+.youtube-player-container .ytp-endscreen-content,
+.youtube-player-container .ytp-ce-element {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+/* Additional YouTube UI cleanup */
+.youtube-player-container .ytp-watermark,
+.youtube-player-container .ytp-chrome-top-buttons {
+  display: none !important;
 }

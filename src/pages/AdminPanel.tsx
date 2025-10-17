@@ -39,6 +39,7 @@ function renderProgressBar(status_stage: string) {
     "review_onboarding",
     "release",
     "review_release",
+    "release_scheduled",
     "sales_dashboard",
     "set_closure",
   ];
@@ -164,6 +165,17 @@ const AdminPanel = () => {
     const [showReviewModal, setShowReviewModal] = useState<{ open: boolean, sub: any | null }>({ open: false, sub: null });
   // Onboarding modal state
   const [showOnboardingModal, setShowOnboardingModal] = useState<{ open: boolean, subId: string | null }>({ open: false, subId: null });
+  
+  // Review Onboarding modal state
+  const [showReviewOnboardingModal, setShowReviewOnboardingModal] = useState<{ open: boolean, sub: any | null }>({ open: false, sub: null });
+  
+  // Review Release modal state
+  const [showReviewReleaseModal, setShowReviewReleaseModal] = useState<{ open: boolean, sub: any | null }>({ open: false, sub: null });
+  
+  // Admin release form state
+  const [adminReleaseDate, setAdminReleaseDate] = useState('');
+  const [adminTicketPrice, setAdminTicketPrice] = useState('');
+  
   useEffect(() => {
     // Prevent browser caching of admin panel
     document.cookie = 'Cache-Control=no-store, no-cache, must-revalidate';
@@ -279,6 +291,9 @@ const AdminPanel = () => {
     custom_tag: '',
     trailer_link: '',
     censor_certificate: '',
+    submission_id: '',
+    scheduled_release_datetime: '',
+    is_published: false,
   });
 
   // Remove cast_ids and crew_ids from filmForm state
@@ -367,6 +382,13 @@ const AdminPanel = () => {
   useEffect(() => {
     if (activeTab === 'films') {
       fetchFilms();
+      
+      // Auto-refresh films every 30 seconds to show updated status
+      const interval = setInterval(() => {
+        fetchFilms();
+      }, 30000);
+      
+      return () => clearInterval(interval);
     }
   }, [activeTab]);
 
@@ -693,9 +715,46 @@ const AdminPanel = () => {
     const runtimeValue = filmForm.runtime === "" ? null : Number(filmForm.runtime);
     const ticketPriceValue = filmForm.ticket_price === "" ? null : Number(filmForm.ticket_price);
 
+    // Determine publication status based on scheduling rules
+    let shouldBePublished = filmForm.is_published;
+    let scheduledDateTimeUTC = filmForm.scheduled_release_datetime;
+    
+    if (filmForm.scheduled_release_datetime) {
+      // The datetime-local input gives us the time as the user entered it
+      // We need to treat this as IST time and convert to UTC for storage
+      
+      // Parse the datetime string as if it's in IST
+      const [datePart, timePart] = filmForm.scheduled_release_datetime.split('T');
+      const [year, month, day] = datePart.split('-').map(Number);
+      const [hours, minutes] = timePart.split(':').map(Number);
+      
+      // Create a UTC date object, treating the input as if it were UTC
+      // This gives us a "neutral" time that we can then adjust
+      const neutralDate = new Date(Date.UTC(year, month - 1, day, hours, minutes));
+      
+      // Now convert from IST to UTC by subtracting 5 hours 30 minutes (IST is UTC+5:30)
+      const utcDate = new Date(neutralDate.getTime() - (5.5 * 60 * 60 * 1000));
+      scheduledDateTimeUTC = utcDate.toISOString();
+      
+      // For comparison, we need to compare with IST time
+      // Get current time in IST
+      const nowUTC = new Date();
+      const nowIST = new Date(nowUTC.getTime() + (5.5 * 60 * 60 * 1000));
+      
+      // If scheduled for future (in IST), override is_published to false
+      if (neutralDate > nowIST) {
+        shouldBePublished = false;
+      }
+      // If scheduled for past/present (in IST) and not manually set to unpublished, auto-publish
+      else if (neutralDate <= nowIST && filmForm.is_published !== false) {
+        shouldBePublished = true;
+      }
+    }
+
     // Build payload
     const rawPayload = {
       ...filmForm,
+      scheduled_release_datetime: scheduledDateTimeUTC,
       genres: genresArray,
       trailer_thumbnail: trailerThumbUrl,
       film_thumbnail_fullsize: fullsizeThumbUrl,
@@ -706,6 +765,7 @@ const AdminPanel = () => {
       language: typeof filmForm.language === 'string' ? filmForm.language : Array.isArray(filmForm.language) ? filmForm.language.join(', ') : '',
       runtime: runtimeValue,
       ticket_price: ticketPriceValue,
+      is_published: shouldBePublished,
     };
     // Remove file-related fields not in DB
     const {
@@ -755,9 +815,63 @@ const AdminPanel = () => {
           });
         }
       }
+
+      // Handle scheduling for the film
+      try {
+        if (filmForm.scheduled_release_datetime && !shouldBePublished) {
+          // Film is scheduled for future - create/update the scheduled job
+          const { data: scheduleResult, error: scheduleError } = await supabase
+            .rpc('schedule_film_publication', { film_id: filmId });
+          
+          if (scheduleError) {
+            console.error('Error scheduling film publication:', scheduleError);
+            toast({
+              title: "Warning",
+              description: "Film saved but scheduling failed. Please contact support.",
+              variant: "destructive",
+            });
+          } else {
+            console.log('Film publication scheduled:', scheduleResult);
+          }
+        } else if (editingFilmId) {
+          // Film is being updated and no future schedule - unschedule any existing job
+          const { data: unscheduletResult, error: unscheduleError } = await supabase
+            .rpc('unschedule_film_publication', { film_id: filmId });
+          
+          if (unscheduleError) {
+            console.error('Error unscheduling film publication:', unscheduleError);
+          } else {
+            console.log('Film publication unscheduled:', unscheduletResult);
+          }
+        }
+      } catch (scheduleErr) {
+        console.error('Scheduling operation failed:', scheduleErr);
+      }
       setShowFilmModal(false);
       setFilmForm({
-        title: '', synopsis: '', genres: [], trailer_thumbnail: '', film_thumbnail_fullsize: '', film_thumbnail_vertical: '', film_thumbnail_horizontal: '', film_playback_id: '', custom_tag: '', trailerFile: null,
+        title: '',
+        synopsis: '',
+        genres: [],
+        trailer_thumbnail: '',
+        film_thumbnail_fullsize: '',
+        film_thumbnail_vertical: '',
+        film_thumbnail_horizontal: '',
+        has_ticket: false,
+        ticket_price: '',
+        film_expiry_date: '',
+        runtime: '',
+        language: '',
+        quality: '',
+        has_funding: false,
+        release_year: '',
+        is_trailer_enabled: false,
+        film_playback_id: '',
+        custom_tag: '',
+        trailer_link: '',
+        censor_certificate: '',
+        submission_id: '',
+        scheduled_release_datetime: '',
+        is_published: false,
       });
       setCast([]);
       setCrew([]);
@@ -784,25 +898,54 @@ const AdminPanel = () => {
     if (!error) fetchFilms();
   }
 
-  function handleEditFilm(film: any) {
+  async function handleEditFilm(film: any) {
+    // Fetch the latest film data to ensure we have current publication status
+    const { data: latestFilm, error } = await supabase
+      .from('films')
+      .select('*')
+      .eq('id', film.id)
+      .single();
+    
+    const filmData = latestFilm || film;
+    
     setFilmForm({
-      ...film,
-      title: film.title ?? '',
-      synopsis: film.synopsis ?? '',
-      genres: Array.isArray(film.genres) ? film.genres.join(', ') : (film.genres ?? ''),
-      trailer_thumbnail: film.trailer_thumbnail ?? '',
-      film_thumbnail_fullsize: film.film_thumbnail_fullsize ?? '',
-      film_thumbnail_vertical: film.film_thumbnail_vertical ?? '',
-      film_thumbnail_horizontal: film.film_thumbnail_horizontal ?? '',
+      ...filmData,
+      title: filmData.title ?? '',
+      synopsis: filmData.synopsis ?? '',
+      genres: Array.isArray(filmData.genres) ? filmData.genres.join(', ') : (filmData.genres ?? ''),
+      trailer_thumbnail: filmData.trailer_thumbnail ?? '',
+      film_thumbnail_fullsize: filmData.film_thumbnail_fullsize ?? '',
+      film_thumbnail_vertical: filmData.film_thumbnail_vertical ?? '',
+      film_thumbnail_horizontal: filmData.film_thumbnail_horizontal ?? '',
       trailerThumbFile: null,
       fullsizeThumbFile: null,
       horizontalThumbFile: null,
-      film_playback_id: film.film_playback_id ?? '',
-      custom_tag: film.custom_tag ?? '',
+      film_playback_id: filmData.film_playback_id ?? '',
+      custom_tag: filmData.custom_tag ?? '',
       trailerFile: null,
-      language: film.language ?? '',
+      language: filmData.language ?? '',
+      submission_id: filmData.submission_id ?? '',
+      scheduled_release_datetime: filmData.scheduled_release_datetime ? 
+        (() => {
+          // Convert UTC from database back to IST for display
+          const utcDate = new Date(filmData.scheduled_release_datetime);
+          
+          // Add 5.5 hours to convert UTC back to IST
+          const istDate = new Date(utcDate.getTime() + (5.5 * 60 * 60 * 1000));
+          
+          // Format as YYYY-MM-DDTHH:MM for datetime-local input
+          const year = istDate.getUTCFullYear();
+          const month = String(istDate.getUTCMonth() + 1).padStart(2, '0');
+          const day = String(istDate.getUTCDate()).padStart(2, '0');
+          const hours = String(istDate.getUTCHours()).padStart(2, '0');
+          const minutes = String(istDate.getUTCMinutes()).padStart(2, '0');
+          
+          return `${year}-${month}-${day}T${hours}:${minutes}`;
+        })() : '',
+      is_published: filmData.is_published ?? false,
     });
-    setEditingFilmId(film.id);
+    setEditingFilmId(filmData.id);
+    fetchFilmSubmissions();
     setShowFilmModal(true);
   }
 
@@ -850,16 +993,95 @@ const AdminPanel = () => {
   const [filmSubmissions, setFilmSubmissions] = useState([]);
   const [loadingSubmissions, setLoadingSubmissions] = useState(false);
 
+  // Function to fetch film submissions
+  async function fetchFilmSubmissions() {
+    setLoadingSubmissions(true);
+    try {
+      const { data, error } = await supabase
+        .from('film_submissions')
+        .select('*')
+        .order('submitted_at', { ascending: false });
+      
+      if (!error && data) {
+        setFilmSubmissions(data);
+      }
+    } catch (error) {
+      console.error('Error fetching film submissions:', error);
+    } finally {
+      setLoadingSubmissions(false);
+    }
+  }
+
   useEffect(() => {
     if (activeTab === 'submissions') {
       setLoadingSubmissions(true);
       supabase.from('film_submissions').select('*').order('submitted_at', { ascending: false })
-        .then(({ data, error }) => {
-          if (!error && data) setFilmSubmissions(data);
+        .then(async ({ data, error }) => {
+          if (!error && data) {
+            // Auto-advance/revert between onboarding and review_onboarding based on payment status
+            const updatedData = [];
+            let autoAdvancedCount = 0;
+            let autoRevertedCount = 0;
+            
+            for (const submission of data) {
+              if (submission.status_stage === 'onboarding' && submission.onboarding_fee_paid === true) {
+                // Automatically move to review_onboarding stage
+                const { error: updateError } = await supabase
+                  .from('film_submissions')
+                  .update({ status_stage: 'review_onboarding' })
+                  .eq('id', submission.id);
+                
+                if (!updateError) {
+                  // Update the local data to reflect the change
+                  updatedData.push({ ...submission, status_stage: 'review_onboarding' });
+                  autoAdvancedCount++;
+                } else {
+                  console.error('Failed to auto-advance submission:', updateError);
+                  updatedData.push(submission);
+                }
+              } else if (submission.status_stage === 'review_onboarding' && (submission.onboarding_fee_paid === false || submission.onboarding_fee_paid === null)) {
+                // Automatically revert to onboarding stage
+                const { error: updateError } = await supabase
+                  .from('film_submissions')
+                  .update({ status_stage: 'onboarding' })
+                  .eq('id', submission.id);
+                
+                if (!updateError) {
+                  // Update the local data to reflect the change
+                  updatedData.push({ ...submission, status_stage: 'onboarding' });
+                  autoRevertedCount++;
+                } else {
+                  console.error('Failed to auto-revert submission:', updateError);
+                  updatedData.push(submission);
+                }
+              } else {
+                updatedData.push(submission);
+              }
+            }
+            
+            // Show notifications for auto-actions
+            if (autoAdvancedCount > 0) {
+              toast({
+                title: 'Auto-advancement completed',
+                description: `${autoAdvancedCount} submission(s) automatically moved to Review Onboarding stage after payment completion.`,
+                variant: 'default'
+              });
+            }
+            
+            if (autoRevertedCount > 0) {
+              toast({
+                title: 'Auto-reversion completed',
+                description: `${autoRevertedCount} submission(s) automatically moved back to Onboarding stage after payment reversal.`,
+                variant: 'default'
+              });
+            }
+            
+            setFilmSubmissions(updatedData);
+          }
           setLoadingSubmissions(false);
         });
     }
-  }, [activeTab]);
+  }, [activeTab, toast]);
 
   const sections = [
     { id: 1, name: 'Trending Now', filmCount: 8, order: 1 },
@@ -878,6 +1100,7 @@ const AdminPanel = () => {
           { key: 'review_onboarding', label: 'Review Onboarding', color: 'bg-purple-300' },
           { key: 'release', label: 'Release', color: 'bg-yellow-500' },
           { key: 'review_release', label: 'Review Release', color: 'bg-yellow-300' },
+          { key: 'release_scheduled', label: 'Release Scheduled', color: 'bg-orange-500' },
           { key: 'sales', label: 'Sales Dashboard', color: 'bg-green-500' },
           { key: 'closure', label: 'Set Closure', color: 'bg-gray-500' },
         ];
@@ -941,6 +1164,14 @@ const AdminPanel = () => {
                                     aria-label="Edit onboarding instructions"
                                   />
                                 )}
+                                {stage.key === 'review_onboarding' && (
+                                  <button
+                                    className={`absolute w-10 h-10 top-0 left-1/2 -translate-x-1/2 z-20 bg-transparent cursor-pointer`}
+                                    style={{ outline: 'none', border: 'none' }}
+                                    onClick={() => setShowReviewOnboardingModal({ open: true, sub })}
+                                    aria-label="Review Onboarding"
+                                  />
+                                )}
                                 {/* Connecting line to next dot, rendered behind the dot */}
                                 {idx < stages.length - 1 && (
                                   <div className="absolute top-5 left-1/2 w-[calc(100%-2.5rem)] h-2 -z-10 flex items-center pointer-events-none" style={{ marginLeft: '20px' }}>
@@ -972,37 +1203,23 @@ const AdminPanel = () => {
                             </div>
                           ))}
                         </div>
-                        {/* Onboarding Modal */}
-                        {showOnboardingModal.open && showOnboardingModal.subId === sub.id && (
-                          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-                            <div className="bg-gradient-to-br from-black/90 via-black/70 to-tiketx-blue/20 rounded-2xl p-8 shadow-2xl border border-white/10 w-full max-w-2xl">
-                              <h2 className="text-2xl font-bold mb-4 text-tiketx-blue">Set Onboarding Instructions</h2>
-                              <label className="block text-lg font-bold text-tiketx-blue mb-2">Checklist Steps</label>
-                              <OnboardingChecklistEditor
-                                steps={tempChecklistSteps}
-                                onChange={steps => setTempChecklistSteps(steps)}
-                              />
-                              <div className="flex justify-end gap-4 mt-6">
-                                <button
-                                  className="px-6 py-2 rounded-xl bg-tiketx-blue text-white font-bold shadow hover:bg-tiketx-violet transition"
-                                  onClick={async () => {
-                                    await supabase.from('film_submissions').update({ onboarding_instructions: JSON.stringify(tempChecklistSteps) }).eq('id', sub.id);
-                                    setFilmSubmissions(filmSubmissions => filmSubmissions.map(s => s.id === sub.id ? { ...s, onboarding_instructions: tempChecklistSteps } : s));
-                                    setShowOnboardingModal({ open: false, subId: null });
-                                  }}
-                                >Save</button>
-                                <button className="px-6 py-2 rounded-xl bg-gray-600 text-white font-bold shadow hover:bg-gray-800 transition" onClick={() => setShowOnboardingModal({ open: false, subId: null })}>Close</button>
-                              </div>
-                            </div>
-                          </div>
-                        )}
                         {/* Controls */}
                         <div className="flex flex-col gap-4 min-w-[180px] items-end">
                           <div className="flex flex-row gap-2 items-center">
                             {currentStageIdx < stages.length - 1 && (
                               <button
                                 className="bg-gradient-to-r from-tiketx-blue via-tiketx-violet to-tiketx-pink px-4 py-2 rounded-lg text-sm font-bold text-white shadow hover:scale-105 transition-all duration-200"
-                                onClick={() => handleStageChange(sub.id, stages[currentStageIdx + 1].key)}
+                                onClick={() => {
+                                  // If moving from review_release to release_scheduled, show modal
+                                  if (sub.status_stage === 'review_release' && stages[currentStageIdx + 1].key === 'release_scheduled') {
+                                    // Initialize form state with current values
+                                    setAdminReleaseDate(sub.scheduled_release_date?.split('T')[0] || '');
+                                    setAdminTicketPrice(sub.final_ticket_price?.toString() || '');
+                                    setShowReviewReleaseModal({ open: true, sub });
+                                  } else {
+                                    handleStageChange(sub.id, stages[currentStageIdx + 1].key);
+                                  }
+                                }}
                               >
                                 Move to {stages[currentStageIdx + 1].label}
                               </button>
@@ -1039,6 +1256,7 @@ const AdminPanel = () => {
                       message: showReviewModal.sub.message,
                       submitted_at: showReviewModal.sub.submitted_at,
                       synopsis: showReviewModal.sub.synopsis,
+                      submission_rejection_reason: showReviewModal.sub.submission_rejection_reason,
                     }}
                     onApprove={async () => {
                       await supabase.from('film_submissions').update({ status_stage: 'onboarding' }).eq('id', showReviewModal.sub.id);
@@ -1051,6 +1269,352 @@ const AdminPanel = () => {
                       setFilmSubmissions(filmSubmissions => filmSubmissions.map(s => s.id === showReviewModal.sub.id ? { ...s, status_stage: 'submission_rejected', submission_rejection_reason: rejectionReason } : s));
                     }}
                   />
+                )}
+                
+                {/* Onboarding Modal */}
+                {showOnboardingModal.open && showOnboardingModal.subId && (
+                  <Dialog open={showOnboardingModal.open} onOpenChange={(open) => !open && setShowOnboardingModal({ open: false, subId: null })}>
+                    <DialogContent className="w-full max-w-3xl max-h-[80vh] overflow-y-auto p-8 rounded-2xl bg-gradient-to-br from-gray-900 via-black to-gray-800 text-white border border-gray-700 shadow-2xl">
+                      <DialogHeader>
+                        <DialogTitle className="text-3xl font-extrabold mb-6 bg-gradient-to-r from-blue-400 via-blue-600 to-blue-400 bg-clip-text text-transparent drop-shadow-lg tracking-tight">
+                          Set Onboarding Instructions
+                        </DialogTitle>
+                        <DialogDescription className="text-gray-300 mb-6">
+                          Create or edit the onboarding checklist for <span className="font-bold text-white">{filmSubmissions.find(s => s.id === showOnboardingModal.subId)?.film_title}</span>.
+                        </DialogDescription>
+                      </DialogHeader>
+                      
+                      <div className="space-y-6">
+                        <div>
+                          <label className="block text-lg font-bold text-tiketx-blue mb-4">Checklist Steps</label>
+                          <OnboardingChecklistEditor
+                            steps={tempChecklistSteps}
+                            onChange={steps => setTempChecklistSteps(steps)}
+                          />
+                        </div>
+                        
+                        <div className="flex justify-end gap-4 pt-4 border-t border-white/10">
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => setShowOnboardingModal({ open: false, subId: null })}
+                            className="px-6 py-2 rounded-xl bg-gray-600 text-white font-bold shadow hover:bg-gray-800 transition"
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            type="button"
+                            onClick={async () => {
+                              await supabase.from('film_submissions').update({ onboarding_instructions: JSON.stringify(tempChecklistSteps) }).eq('id', showOnboardingModal.subId);
+                              setFilmSubmissions(filmSubmissions => filmSubmissions.map(s => s.id === showOnboardingModal.subId ? { ...s, onboarding_instructions: tempChecklistSteps } : s));
+                              setShowOnboardingModal({ open: false, subId: null });
+                            }}
+                            className="px-6 py-2 rounded-xl bg-tiketx-blue text-white font-bold shadow hover:bg-tiketx-violet transition"
+                          >
+                            Save Instructions
+                          </Button>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                )}
+                
+                {/* Review Onboarding Modal */}
+                {showReviewOnboardingModal.open && showReviewOnboardingModal.sub && (
+                  <Dialog open={showReviewOnboardingModal.open} onOpenChange={(open) => !open && setShowReviewOnboardingModal({ open: false, sub: null })}>
+                    <DialogContent className="w-full max-w-4xl max-h-[80vh] overflow-y-auto p-8 rounded-2xl bg-gradient-to-br from-gray-900 via-black to-gray-800 text-white border border-gray-700 shadow-2xl">
+                      <DialogHeader>
+                        <DialogTitle className="text-3xl font-extrabold mb-6 bg-gradient-to-r from-blue-400 via-blue-600 to-black bg-clip-text text-transparent drop-shadow-lg tracking-tight">
+                          Review Onboarding Submission
+                        </DialogTitle>
+                        <DialogDescription className="text-gray-300 mb-6">
+                          Review the onboarding details for <span className="font-bold text-white">{showReviewOnboardingModal.sub.film_title}</span>.
+                        </DialogDescription>
+                      </DialogHeader>
+                      
+                      <div className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-4">
+                            <div className="flex items-center gap-2">
+                              <Film className="w-5 h-5 text-blue-400" />
+                              <span className="font-semibold text-blue-300">Film Title:</span>
+                              <span className="text-white">{showReviewOnboardingModal.sub.film_title}</span>
+                            </div>
+                            
+                            <div className="flex items-center gap-2">
+                              <Users className="w-5 h-5 text-blue-400" />
+                              <span className="font-semibold text-blue-300">Submitter:</span>
+                              <span className="text-white">{showReviewOnboardingModal.sub.name}</span>
+                            </div>
+                            
+                            <div className="flex items-center gap-2">
+                              <CheckCircle className="w-5 h-5 text-blue-400" />
+                              <span className="font-semibold text-blue-300">Terms Agreed:</span>
+                              <span className={`font-semibold ${showReviewOnboardingModal.sub.agreed_terms ? 'text-green-400' : 'text-red-400'}`}>
+                                {showReviewOnboardingModal.sub.agreed_terms ? 'Yes' : 'No'}
+                              </span>
+                            </div>
+                            
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-blue-300">Onboarding Fee:</span>
+                              <span className="text-white">₹{showReviewOnboardingModal.sub.onboarding_fee || 'Not set'}</span>
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-4">
+                            <div className="flex items-center gap-2">
+                              <CheckCircle className="w-5 h-5 text-blue-400" />
+                              <span className="font-semibold text-blue-300">Fee Paid:</span>
+                              <span className={`font-semibold ${showReviewOnboardingModal.sub.onboarding_fee_paid ? 'text-green-400' : 'text-red-400'}`}>
+                                {showReviewOnboardingModal.sub.onboarding_fee_paid ? 'Yes' : 'No'}
+                              </span>
+                            </div>
+                            
+                            {showReviewOnboardingModal.sub.onboarding_fee_paid_datetime && (
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-blue-300">Payment Date:</span>
+                                <span className="text-white">
+                                  {new Date(showReviewOnboardingModal.sub.onboarding_fee_paid_datetime).toLocaleDateString('en-US', {
+                                    year: 'numeric',
+                                    month: 'long',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {showReviewOnboardingModal.sub.drive_link && (
+                          <div className="space-y-2">
+                            <span className="font-semibold text-blue-300">Drive Link:</span>
+                            <div className="bg-gray-800/50 rounded-lg p-3">
+                              <a 
+                                href={showReviewOnboardingModal.sub.drive_link} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-blue-400 hover:text-blue-300 underline break-all"
+                              >
+                                {showReviewOnboardingModal.sub.drive_link}
+                              </a>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {showReviewOnboardingModal.sub.onboarding_instructions && (
+                          <div className="space-y-2">
+                            <span className="font-semibold text-blue-300">Onboarding Instructions:</span>
+                            <div className="bg-gray-800/50 rounded-lg p-4">
+                              {(() => {
+                                try {
+                                  const instructions = typeof showReviewOnboardingModal.sub.onboarding_instructions === 'string' 
+                                    ? JSON.parse(showReviewOnboardingModal.sub.onboarding_instructions) 
+                                    : showReviewOnboardingModal.sub.onboarding_instructions;
+                                  
+                                  if (Array.isArray(instructions)) {
+                                    return (
+                                      <ul className="space-y-2">
+                                        {instructions.map((instruction, idx) => (
+                                          <li key={idx} className="flex items-center gap-2">
+                                            <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0" />
+                                            <span className="text-gray-200">{instruction}</span>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    );
+                                  } else {
+                                    return <p className="text-gray-200">{String(instructions)}</p>;
+                                  }
+                                } catch {
+                                  return <p className="text-gray-200">{String(showReviewOnboardingModal.sub.onboarding_instructions)}</p>;
+                                }
+                              })()}
+                            </div>
+                          </div>
+                        )}
+                        
+                        <div className="flex justify-end gap-4 pt-6 border-t border-white/10">
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => setShowReviewOnboardingModal({ open: false, sub: null })}
+                            className="px-6 py-2 rounded-xl bg-gray-600 text-white font-bold shadow hover:bg-gray-800 transition"
+                          >
+                            Close
+                          </Button>
+                          <Button
+                            type="button"
+                            onClick={async () => {
+                              await supabase.from('film_submissions').update({ status_stage: 'release' }).eq('id', showReviewOnboardingModal.sub.id);
+                              setShowReviewOnboardingModal({ open: false, sub: null });
+                              setFilmSubmissions(filmSubmissions => filmSubmissions.map(s => s.id === showReviewOnboardingModal.sub.id ? { ...s, status_stage: 'release' } : s));
+                            }}
+                            className="px-6 py-2 rounded-xl bg-green-600 text-white font-bold shadow hover:bg-green-700 transition"
+                          >
+                            Approve Onboarding
+                          </Button>
+                          <Button
+                            type="button"
+                            onClick={async () => {
+                              await supabase.from('film_submissions').update({ status_stage: 'onboarding' }).eq('id', showReviewOnboardingModal.sub.id);
+                              setShowReviewOnboardingModal({ open: false, sub: null });
+                              setFilmSubmissions(filmSubmissions => filmSubmissions.map(s => s.id === showReviewOnboardingModal.sub.id ? { ...s, status_stage: 'onboarding' } : s));
+                            }}
+                            className="px-6 py-2 rounded-xl bg-red-600 text-white font-bold shadow hover:bg-red-700 transition"
+                          >
+                            Reject - Send Back
+                          </Button>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                )}
+                
+                {/* Review Release Modal */}
+                {showReviewReleaseModal.open && showReviewReleaseModal.sub && (
+                  <Dialog open={showReviewReleaseModal.open} onOpenChange={(open) => !open && setShowReviewReleaseModal({ open: false, sub: null })}>
+                    <DialogContent className="w-full max-w-4xl max-h-[90vh] overflow-y-auto p-8 rounded-2xl bg-gradient-to-br from-gray-900 via-black to-gray-800 text-white border border-gray-700 shadow-2xl">
+                      <DialogHeader>
+                        <DialogTitle className="text-3xl font-extrabold mb-6 bg-gradient-to-r from-orange-400 via-orange-600 to-orange-400 bg-clip-text text-transparent drop-shadow-lg tracking-tight">
+                          Review Release Schedule
+                        </DialogTitle>
+                        <DialogDescription className="text-gray-300 mb-6">
+                          Review and manage the release schedule for <span className="font-bold text-white">{showReviewReleaseModal.sub.film_title}</span>.
+                        </DialogDescription>
+                      </DialogHeader>
+                      
+                      <div className="space-y-6">
+                        {/* Creator's Scheduled Information */}
+                        <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-6">
+                          <h3 className="text-xl font-bold text-blue-300 mb-4">Creator's Release Schedule</h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-sm font-semibold text-gray-400 mb-1">Scheduled Release Date:</label>
+                              <span className="text-white text-lg font-bold">
+                                {showReviewReleaseModal.sub.scheduled_release_date 
+                                  ? new Date(showReviewReleaseModal.sub.scheduled_release_date).toLocaleDateString('en-US', { 
+                                      year: 'numeric', month: 'long', day: 'numeric' 
+                                    })
+                                  : 'Not set'
+                                }
+                              </span>
+                            </div>
+                            <div>
+                              <label className="block text-sm font-semibold text-gray-400 mb-1">Currency:</label>
+                              <span className="text-white text-lg font-bold">{showReviewReleaseModal.sub.final_currency || 'Not set'}</span>
+                            </div>
+                            <div>
+                              <label className="block text-sm font-semibold text-gray-400 mb-1">Ticket Price:</label>
+                              <span className="text-white text-lg font-bold">{showReviewReleaseModal.sub.final_ticket_price || 'Not set'}</span>
+                            </div>
+                            <div>
+                              <label className="block text-sm font-semibold text-gray-400 mb-1">Release Terms Agreed:</label>
+                              <span className={`font-semibold text-lg ${showReviewReleaseModal.sub.release_agreement ? 'text-green-400' : 'text-red-400'}`}>
+                                {showReviewReleaseModal.sub.release_agreement ? 'Yes' : 'No'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Admin Edit Section */}
+                        <div className="bg-orange-900/20 border border-orange-500/30 rounded-lg p-6">
+                          <h3 className="text-xl font-bold text-orange-300 mb-4">Admin Actions</h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-sm font-semibold text-gray-400 mb-2">Reschedule Release Date:</label>
+                              <input
+                                type="date"
+                                value={adminReleaseDate}
+                                onChange={(e) => setAdminReleaseDate(e.target.value)}
+                                className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-semibold text-gray-400 mb-2">Edit Ticket Price:</label>
+                              <input
+                                type="number"
+                                value={adminTicketPrice}
+                                onChange={(e) => setAdminTicketPrice(e.target.value)}
+                                placeholder="Enter price"
+                                className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex justify-end gap-4 pt-6 border-t border-white/10">
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => {
+                              setAdminReleaseDate('');
+                              setAdminTicketPrice('');
+                              setShowReviewReleaseModal({ open: false, sub: null });
+                            }}
+                            className="px-6 py-2 rounded-xl bg-gray-600 text-white font-bold shadow hover:bg-gray-800 transition"
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            type="button"
+                            onClick={async () => {
+                              const updateData: any = { status_stage: 'release_scheduled' };
+                              
+                              // Always update the date if a date is provided
+                              if (adminReleaseDate) {
+                                updateData.scheduled_release_date = adminReleaseDate;
+                              }
+                              
+                              // Always update the ticket price if a price is provided
+                              if (adminTicketPrice && adminTicketPrice.trim() !== '') {
+                                updateData.final_ticket_price = parseFloat(adminTicketPrice);
+                              }
+                              
+                              console.log('Updating film submission with data:', updateData);
+                              
+                              const { error } = await supabase.from('film_submissions').update(updateData).eq('id', showReviewReleaseModal.sub.id);
+                              
+                              if (error) {
+                                console.error('Error updating film submission:', error);
+                                alert('Failed to update release schedule: ' + error.message);
+                                return;
+                              }
+                              
+                              console.log('Successfully updated film submission');
+                              
+                              // Clear form state
+                              setAdminReleaseDate('');
+                              setAdminTicketPrice('');
+                              setShowReviewReleaseModal({ open: false, sub: null });
+                              
+                              // Update the local state to reflect changes
+                              setFilmSubmissions(filmSubmissions => filmSubmissions.map(s => 
+                                s.id === showReviewReleaseModal.sub.id 
+                                  ? { ...s, ...updateData } 
+                                  : s
+                              ));
+                            }}
+                            className="px-6 py-2 rounded-xl bg-green-600 text-white font-bold shadow hover:bg-green-700 transition"
+                          >
+                            Approve & Schedule Release
+                          </Button>
+                          <Button
+                            type="button"
+                            onClick={async () => {
+                              await supabase.from('film_submissions').update({ status_stage: 'release' }).eq('id', showReviewReleaseModal.sub.id);
+                              setShowReviewReleaseModal({ open: false, sub: null });
+                              setFilmSubmissions(filmSubmissions => filmSubmissions.map(s => s.id === showReviewReleaseModal.sub.id ? { ...s, status_stage: 'release' } : s));
+                            }}
+                            className="px-6 py-2 rounded-xl bg-red-600 text-white font-bold shadow hover:bg-red-700 transition"
+                          >
+                            Reject - Send Back to Release
+                          </Button>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 )}
               </div>
             )}
@@ -1235,10 +1799,24 @@ const AdminPanel = () => {
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold">Films</h2>
-              <button className="gradient-button flex items-center space-x-2" onClick={() => setShowFilmModal(true)}>
-                <Plus size={20} />
-                <span>Add Film</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button 
+                  className="p-2 bg-gray-500/20 text-gray-400 rounded-lg hover:bg-gray-500/30 transition-colors" 
+                  onClick={fetchFilms}
+                  title="Refresh films list"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </button>
+                <button className="gradient-button flex items-center space-x-2" onClick={() => {
+                  fetchFilmSubmissions();
+                  setShowFilmModal(true);
+                }}>
+                  <Plus size={20} />
+                  <span>Add Film</span>
+                </button>
+              </div>
             </div>
             <div className="grid gap-4">
               {films.map((film) => (
@@ -1249,10 +1827,48 @@ const AdminPanel = () => {
                     className="w-32 h-20 object-cover rounded-lg"
                   />
                   <div className="flex-1">
-                    <h3 className="font-semibold">{film.title}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold">{film.title}</h3>
+                      {film.is_published && (
+                        <div className="flex items-center gap-1 bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
+                          <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+                          LIVE
+                        </div>
+                      )}
+                      {!film.is_published && film.scheduled_release_datetime && (
+                        <div className="flex items-center gap-1 bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-xs font-medium">
+                          <div className="w-1.5 h-1.5 bg-orange-500 rounded-full"></div>
+                          SCHEDULED
+                        </div>
+                      )}
+                      {!film.is_published && !film.scheduled_release_datetime && (
+                        <div className="flex items-center gap-1 bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-xs font-medium">
+                          DRAFT
+                        </div>
+                      )}
+                    </div>
                     <p className="text-sm text-gray-400">{film.language}</p>
                     <div className="flex items-center gap-2 mt-1">
                       <span className={`text-xs font-semibold ${film.has_ticket ? 'text-green-400' : 'text-gray-400'}`}>{film.has_ticket ? 'Has Ticket' : 'No Ticket'}</span>
+                      {film.scheduled_release_datetime && (
+                        <span className="text-xs text-blue-400">
+                          Scheduled: {(() => {
+                            const utcDate = new Date(film.scheduled_release_datetime);
+                            const istDate = new Date(utcDate.getTime() + (5.5 * 60 * 60 * 1000));
+                            
+                            // Format in IST explicitly
+                            const day = istDate.getUTCDate();
+                            const month = istDate.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' });
+                            const hours = istDate.getUTCHours();
+                            const minutes = istDate.getUTCMinutes();
+                            const ampm = hours >= 12 ? 'pm' : 'am';
+                            const displayHours = hours % 12 || 12;
+                            const displayMinutes = minutes.toString().padStart(2, '0');
+                            
+                            return `${day} ${month}, ${displayHours}:${displayMinutes} ${ampm} IST`;
+                          })()}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="flex space-x-2">
@@ -1330,12 +1946,76 @@ const AdminPanel = () => {
                       <Input placeholder="Expiry Date" type="date" value={filmForm.film_expiry_date ? filmForm.film_expiry_date.slice(0, 10) : ""} onChange={e => setFilmForm(f => ({ ...f, film_expiry_date: e.target.value }))} />
                     </div>
                     <div>
+                      <label className="block mb-1 mt-2">Scheduled Release Date & Time (IST)</label>
+                      <Input 
+                        type="datetime-local" 
+                        value={filmForm.scheduled_release_datetime || ""} 
+                        onChange={e => setFilmForm(f => ({ ...f, scheduled_release_datetime: e.target.value }))} 
+                        className="[color-scheme:dark]"
+                        min={(() => {
+                          // Set minimum to current IST time
+                          const now = new Date();
+                          // Add 5.5 hours to convert to IST
+                          const istNow = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+                          return istNow.toISOString().slice(0, 16);
+                        })()}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Enter date and time in Indian Standard Time (IST). Film will automatically go live at this time.</p>
+                    </div>
+                    <div>
                       <label className="block mb-1 mt-2">Quality</label>
                       <Input placeholder="Quality (e.g. HD, 4K)" value={filmForm.quality || ""} onChange={e => setFilmForm(f => ({ ...f, quality: e.target.value }))} />
                     </div>
                     <div>
                       <label className="block mb-1 mt-2">Languages</label>
                       <Input placeholder="Languages (comma separated, e.g. English, Tamil)" value={filmForm.language || ""} onChange={e => setFilmForm(f => ({ ...f, language: e.target.value }))} />
+                    </div>
+                  </div>
+
+                  {/* Link Submitted Film field */}
+                  <div className="md:col-span-2">
+                    <label className="block mb-1 mt-2">Link Submitted Film (Optional)</label>
+                    <select
+                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                      value={filmForm.submission_id || ''}
+                      onChange={e => setFilmForm(f => ({ ...f, submission_id: e.target.value }))}
+                    >
+                      <option value="">Select a submission (optional)</option>
+                      {filmSubmissions.map((submission: any) => (
+                        <option key={submission.id} value={submission.id}>
+                          {submission.film_title} - {submission.name} - ({submission.status_stage})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Publish Control */}
+                  <div className={`p-4 rounded-lg border ${filmForm.is_published ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                          <Switch 
+                            id="is_published" 
+                            checked={!!filmForm.is_published} 
+                            onCheckedChange={checked => setFilmForm(f => ({ ...f, is_published: checked }))} 
+                          />
+                          <label htmlFor="is_published" className="font-medium">Publish Film Now</label>
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          {filmForm.is_published ? 
+                            "Film is live and visible to users" : 
+                            filmForm.scheduled_release_datetime ? 
+                              "Film will go live automatically on scheduled date" : 
+                              "Film is in draft mode"
+                          }
+                        </div>
+                      </div>
+                      {filmForm.is_published && (
+                        <div className="flex items-center gap-2 bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                          LIVE
+                        </div>
+                      )}
                     </div>
                   </div>
 

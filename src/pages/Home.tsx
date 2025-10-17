@@ -52,18 +52,25 @@ const Home = () => {
     });
     // Fetch movies by section (example: Now Showing, Action Picks, Short Films)
     setFilmsLoading(true);
-    supabase.from("films").select("*").then(({ data, error }) => {
-      if (!error && data) {
-        setAllFilms(data);
-        setLatestReleases(data.filter(m => m.type === "movie"));
-        setActionPicks(data.filter(m => m.genre === "Action"));
-        setShortFilms(data.filter(m => m.type === "short"));
-        // Optionally, set categories from genres
-        const genres = Array.from(new Set(data.map(m => m.genre)));
-        setCategories(genres);
-      }
-      setFilmsLoading(false);
-    });
+    const currentTime = new Date().toISOString();
+    
+    supabase
+      .from("films")
+      .select("*")
+      .eq('is_published', true)
+      .or(`scheduled_release_datetime.is.null,scheduled_release_datetime.lte.${currentTime}`)
+      .then(({ data, error }) => {
+        if (!error && data) {
+          setAllFilms(data);
+          setLatestReleases(data.filter(m => m.type === "movie"));
+          setActionPicks(data.filter(m => m.genre === "Action"));
+          setShortFilms(data.filter(m => m.type === "short"));
+          // Optionally, set categories from genres
+          const genres = Array.from(new Set(data.map(m => m.genre)));
+          setCategories(genres);
+        }
+        setFilmsLoading(false);
+      });
     // Fetch user for welcome message
     (async () => {
       const { data } = await supabase.auth.getUser();
@@ -107,8 +114,34 @@ const Home = () => {
         // setUserTickets({}); // This line is no longer needed
       }
     });
+    // Set up Realtime subscription for film publication events
+    const filmChannel = supabase
+      .channel('film_publications')
+      .on('broadcast', { event: 'film_published' }, (payload) => {
+        console.log('Film published event received:', payload);
+        // Refresh the films list when a film is published
+        const currentTime = new Date().toISOString();
+        supabase
+          .from("films")
+          .select("*")
+          .eq('is_published', true)
+          .or(`scheduled_release_datetime.is.null,scheduled_release_datetime.lte.${currentTime}`)
+          .then(({ data, error }) => {
+            if (!error && data) {
+              setAllFilms(data);
+              setLatestReleases(data.filter(m => m.type === "movie"));
+              setActionPicks(data.filter(m => m.genre === "Action"));
+              setShortFilms(data.filter(m => m.type === "short"));
+              const genres = Array.from(new Set(data.map(m => m.genre)));
+              setCategories(genres);
+            }
+          });
+      })
+      .subscribe();
+
     return () => {
       authListener?.subscription.unsubscribe();
+      filmChannel.unsubscribe();
     };
   }, []);
 
