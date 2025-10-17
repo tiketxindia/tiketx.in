@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { CheckCircle2, ArrowLeft, Star, Clock, Play } from 'lucide-react';
+import { CheckCircle2, ArrowLeft, Star, Clock, Play, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import "../styles/ticket-animations.css";
 import { LoginSignupModal } from '@/components/LoginSignupModal';
 import { useState as useReactState } from 'react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 function formatDate(dateStr) {
   const date = new Date(dateStr);
@@ -43,6 +44,7 @@ const TicketCard = ({ ticket }) => {
   const expiryTime = formatTime(ticket.expiry_date);
   const price = ticket.price || 50;
   const [timeLeft, setTimeLeft] = useState(getTimeLeft(ticket.expiry_date));
+  const [isFeesExpanded, setIsFeesExpanded] = useState(false);
   const isExpired = !timeLeft;
 
   useEffect(() => {
@@ -110,10 +112,62 @@ const TicketCard = ({ ticket }) => {
                     Ticket Expiry : <span className="text-white font-normal">{expiry.day} {expiry.month} {expiry.year}, {expiryTime.hours}:{expiryTime.minutes} {expiryTime.ampm}</span>
                   </div>
                 </div>
-                <div className="flex justify-between items-center mt-5 mb-5">
-                  <span className="text-gray-400 text-[9px] md:text-[13px] font-semibold">Ticket Price</span>
-                  <span className="text-white text-[9px] md:text-[13px] font-bold pr-6">₹ {price.toFixed(2)}</span>
-                </div>
+                {/* Fee Breakdown Section */}
+                {ticket.base_price && (parseFloat(ticket.platform_fee) > 0 || parseFloat(ticket.gst_on_platform_fee) > 0) ? (
+                  <div className="space-y-2 mt-5 mb-5">
+                    {/* Ticket Price */}
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-400 text-[9px] md:text-[13px] font-semibold">Ticket Price</span>
+                      <span className="text-white text-[9px] md:text-[13px] font-bold pr-6">₹ {parseFloat(ticket.base_price).toFixed(2)}</span>
+                    </div>
+                    
+                    {/* Convenience Fee - Collapsible */}
+                    <div className="space-y-1">
+                      {/* Convenience Fee Header */}
+                      <div 
+                        className="flex justify-between items-center cursor-pointer hover:bg-gray-800/30 rounded px-1 py-1 transition-colors"
+                        onClick={() => setIsFeesExpanded(!isFeesExpanded)}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-400 text-[9px] md:text-[13px] font-semibold">Convenience Fee</span>
+                          {isFeesExpanded ? (
+                            <ChevronUp className="w-3 h-3 text-gray-400" />
+                          ) : (
+                            <ChevronDown className="w-3 h-3 text-gray-400" />
+                          )}
+                        </div>
+                        <span className="text-white text-[9px] md:text-[13px] font-bold pr-6">
+                          ₹ {(parseFloat(ticket.platform_fee) + parseFloat(ticket.gst_on_platform_fee)).toFixed(2)}
+                        </span>
+                      </div>
+                      
+                      {/* Expanded Fee Details */}
+                      <div className={`ml-4 space-y-1 border-l border-gray-600 pl-3 overflow-hidden transition-all duration-300 ${
+                        isFeesExpanded ? 'max-h-20 opacity-100' : 'max-h-0 opacity-0'
+                      }`}>
+                        {/* Platform Fee */}
+                        {parseFloat(ticket.platform_fee) > 0 && (
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-500 text-[8px] md:text-[11px] font-medium">Platform Fee</span>
+                            <span className="text-gray-300 text-[8px] md:text-[11px] pr-6">₹ {parseFloat(ticket.platform_fee).toFixed(2)}</span>
+                          </div>
+                        )}
+                        {/* GST */}
+                        {parseFloat(ticket.gst_on_platform_fee) > 0 && (
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-500 text-[8px] md:text-[11px] font-medium">GST 18% on Platform Fee</span>
+                            <span className="text-gray-300 text-[8px] md:text-[11px] pr-6">₹ {parseFloat(ticket.gst_on_platform_fee).toFixed(2)}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex justify-between items-center mt-5 mb-5">
+                    <span className="text-gray-400 text-[9px] md:text-[13px] font-semibold">Ticket Price</span>
+                    <span className="text-white text-[9px] md:text-[13px] font-bold pr-6">₹ {price.toFixed(2)}</span>
+                  </div>
+                )}
                 {/* Gradient accent line */}
                 <div className="border-t-2 border-dotted border-gray-400/40 w-full my-1 md:my-2" />
               </div>
@@ -125,7 +179,9 @@ const TicketCard = ({ ticket }) => {
                     <CheckCircle2 className="text-green-400 w-3 h-3 md:w-5 md:h-5" />
                   </span>
                 </span>
-                <span className="text-sm md:text-2xl font-extrabold tracking-wider pr-6">₹ {price.toFixed(2)}</span>
+                <span className="text-sm md:text-2xl font-extrabold tracking-wider pr-6">
+                  ₹ {(ticket.total_amount_paid ? parseFloat(ticket.total_amount_paid).toFixed(2) : price.toFixed(2))}
+                </span>
               </div>
               {/* Tiket ID and Watch Now row */}
               <div className="flex flex-row items-center justify-between mt-2">
@@ -176,7 +232,7 @@ const MyTikets = () => {
       }
       const { data, error } = await supabase
         .from('film_tickets')
-        .select('id, film_id, purchase_date, expiry_date, is_active, price, films:film_id(id, title, film_thumbnail_vertical, runtime, language, release_year, genres), tiket_id')
+        .select('id, film_id, purchase_date, expiry_date, is_active, price, base_price, platform_fee, gst_on_platform_fee, total_amount_paid, films:film_id(id, title, film_thumbnail_vertical, runtime, language, release_year, genres), tiket_id')
         .eq('user_id', userObj.id)
         .order('purchase_date', { ascending: false });
       if (!error && data) {
@@ -190,7 +246,8 @@ const MyTikets = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-black py-10 px-4 md:px-8 flex flex-col">
+    <TooltipProvider>
+      <div className="min-h-screen bg-black py-10 px-4 md:px-8 flex flex-col">
       <div className="w-full">
         <div className="flex items-center mb-8 w-full">
           <button
@@ -231,6 +288,7 @@ const MyTikets = () => {
         </div>
       )}
     </div>
+    </TooltipProvider>
   );
 };
 

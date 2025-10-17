@@ -4,7 +4,7 @@ import OnboardingChecklistEditor from "../components/OnboardingChecklistEditor";
 // ...existing imports...
 // ...existing code...
 import { useEffect, useState } from 'react';
-import { Upload, Image, Users, BarChart3, Settings, Plus, Edit, Trash2, CheckCircle, Film, GripVertical, Ticket } from 'lucide-react';
+import { Upload, Image, Users, BarChart3, Settings, Plus, Edit, Trash2, CheckCircle, Film, GripVertical, Ticket, DollarSign } from 'lucide-react';
 import { Check, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -280,7 +280,13 @@ const AdminPanel = () => {
     film_thumbnail_horizontal: '',
     has_ticket: false,
     ticket_price: '',
+    ticket_expiry_hours: '',
+    platform_fee_percentage: '',
+    gst_on_platform_fee: '',
+    commission_fee_percentage: '',
+    gst_on_commission_fee: '',
     film_expiry_date: '',
+    closure_expiry_date: '',
     runtime: '',
     language: '',
     quality: '',
@@ -301,6 +307,10 @@ const AdminPanel = () => {
   const [cast, setCast] = useState([]); // [{creator_id, character_name, order}]
   const [crew, setCrew] = useState([]); // [{creator_id, role, order}]
   const [creators, setCreators] = useState([]);
+  
+  // Commission slabs state
+  const [commissionSlabs, setCommissionSlabs] = useState([]); // [{min_tickets, max_tickets, commission_percentage}]
+  const [newSlab, setNewSlab] = useState({ min_tickets: '', max_tickets: '', commission_percentage: '' });
 
   // Add state for creator modal and form at the top of AdminPanel
   const [showCreatorModal, setShowCreatorModal] = useState(false);
@@ -714,6 +724,13 @@ const AdminPanel = () => {
 
     const runtimeValue = filmForm.runtime === "" ? null : Number(filmForm.runtime);
     const ticketPriceValue = filmForm.ticket_price === "" ? null : Number(filmForm.ticket_price);
+    const ticketExpiryHoursValue = filmForm.ticket_expiry_hours === "" ? null : Number(filmForm.ticket_expiry_hours);
+    
+    // Process financial fields
+    const platformFeeValue = filmForm.platform_fee_percentage === "" ? null : Number(filmForm.platform_fee_percentage);
+    const gstOnPlatformFeeValue = filmForm.gst_on_platform_fee === "" ? null : Number(filmForm.gst_on_platform_fee);
+    const commissionFeeValue = filmForm.commission_fee_percentage === "" ? null : Number(filmForm.commission_fee_percentage);
+    const gstOnCommissionFeeValue = filmForm.gst_on_commission_fee === "" ? null : Number(filmForm.gst_on_commission_fee);
 
     // Determine publication status based on scheduling rules
     let shouldBePublished = filmForm.is_published;
@@ -765,6 +782,11 @@ const AdminPanel = () => {
       language: typeof filmForm.language === 'string' ? filmForm.language : Array.isArray(filmForm.language) ? filmForm.language.join(', ') : '',
       runtime: runtimeValue,
       ticket_price: ticketPriceValue,
+      ticket_expiry_hours: ticketExpiryHoursValue,
+      platform_fee_percentage: platformFeeValue,
+      gst_on_platform_fee: gstOnPlatformFeeValue,
+      commission_fee_percentage: commissionFeeValue,
+      gst_on_commission_fee: gstOnCommissionFeeValue,
       is_published: shouldBePublished,
     };
     // Remove file-related fields not in DB
@@ -776,6 +798,14 @@ const AdminPanel = () => {
       verticalThumbFile,
       ...payload
     } = rawPayload;
+
+    // Clean up date fields - convert empty strings to null for database compatibility
+    if (payload.scheduled_release_datetime === '') {
+      payload.scheduled_release_datetime = null;
+    }
+    if (payload.closure_expiry_date === '') {
+      payload.closure_expiry_date = null;
+    }
 
     console.log('Film payload:', payload);
 
@@ -816,6 +846,83 @@ const AdminPanel = () => {
         }
       }
 
+      // Handle commission slabs
+      try {
+        // Remove existing commission slabs for this film
+        const { error: deleteError } = await supabase.from('commission_slabs').delete().eq('film_id', filmId);
+        if (deleteError) {
+          console.error('Error deleting existing commission slabs:', deleteError);
+        }
+        
+        // Insert new commission slabs
+        if (commissionSlabs.length > 0) {
+          console.log('Raw commission slabs from state:', JSON.stringify(commissionSlabs, null, 2));
+          
+          const slabsToInsert = commissionSlabs.map(slab => ({
+            film_id: filmId,
+            min_tickets: parseInt(slab.min_tickets),
+            max_tickets: slab.max_tickets ? parseInt(slab.max_tickets) : null,
+            commission_percentage: parseFloat(slab.commission_percentage)
+          }));
+          
+          console.log('Commission slabs to insert:', JSON.stringify(slabsToInsert, null, 2));
+          
+          const { error: slabError } = await supabase
+            .from('commission_slabs')
+            .insert(slabsToInsert);
+            
+          if (slabError) {
+            console.error('Error saving commission slabs:', slabError);
+            toast({
+              title: "Warning",
+              description: "Film saved but commission slabs could not be saved: " + slabError.message,
+              variant: "destructive",
+            });
+          }
+        }
+      } catch (slabErr) {
+        console.error('Commission slab operation failed:', slabErr);
+        toast({
+          title: "Warning", 
+          description: "Film saved but commission slabs could not be saved",
+          variant: "destructive",
+        });
+      }
+
+      // Log audit trail for scheduling events
+      try {
+        const currentTime = new Date().toISOString();
+        
+        // Check if this is a new scheduling event
+        if (filmForm.scheduled_release_datetime && !shouldBePublished) {
+          const action = editingFilmId ? 'rescheduled' : 'scheduled';
+          await supabase.from('film_events').insert({
+            film_id: filmId,
+            action: action,
+            event_datetime: currentTime,
+            scheduled_for: scheduledDateTimeUTC,
+            metadata: {
+              film_title: filmForm.title,
+              scheduled_via: 'admin_panel'
+            }
+          });
+        } else if (editingFilmId && !filmForm.scheduled_release_datetime) {
+          // Film scheduling was removed
+          await supabase.from('film_events').insert({
+            film_id: filmId,
+            action: 'unscheduled',
+            event_datetime: currentTime,
+            metadata: {
+              film_title: filmForm.title,
+              unscheduled_via: 'admin_panel'
+            }
+          });
+        }
+      } catch (auditError) {
+        console.error('Failed to log audit event:', auditError);
+        // Don't fail the film save, just log the error
+      }
+
       // Handle scheduling for the film
       try {
         if (filmForm.scheduled_release_datetime && !shouldBePublished) {
@@ -847,6 +954,38 @@ const AdminPanel = () => {
       } catch (scheduleErr) {
         console.error('Scheduling operation failed:', scheduleErr);
       }
+
+      // Handle closure scheduling for the film
+      try {
+        if (filmForm.closure_expiry_date) {
+          // Film has closure date - create/update the scheduled closure job
+          const { data: closureResult, error: closureError } = await supabase
+            .rpc('schedule_film_closure', { film_id: filmId });
+          
+          if (closureError) {
+            console.error('Error scheduling film closure:', closureError);
+            toast({
+              title: "Warning",
+              description: "Film saved but closure scheduling failed. Please contact support.",
+              variant: "destructive",
+            });
+          } else {
+            console.log('Film closure scheduled:', closureResult);
+          }
+        } else if (editingFilmId) {
+          // Film is being updated and no closure date - unschedule any existing closure job
+          const { data: unscheduleClosureResult, error: unscheduleClosureError } = await supabase
+            .rpc('unschedule_film_closure', { film_id: filmId });
+          
+          if (unscheduleClosureError) {
+            console.error('Error unscheduling film closure:', unscheduleClosureError);
+          } else {
+            console.log('Film closure unscheduled:', unscheduleClosureResult);
+          }
+        }
+      } catch (closureErr) {
+        console.error('Closure scheduling operation failed:', closureErr);
+      }
       setShowFilmModal(false);
       setFilmForm({
         title: '',
@@ -858,7 +997,13 @@ const AdminPanel = () => {
         film_thumbnail_horizontal: '',
         has_ticket: false,
         ticket_price: '',
+        ticket_expiry_hours: '',
+        platform_fee_percentage: '',
+        gst_on_platform_fee: '',
+        commission_fee_percentage: '',
+        gst_on_commission_fee: '',
         film_expiry_date: '',
+        closure_expiry_date: '',
         runtime: '',
         language: '',
         quality: '',
@@ -875,6 +1020,8 @@ const AdminPanel = () => {
       });
       setCast([]);
       setCrew([]);
+      setCommissionSlabs([]);
+      setNewSlab({ min_tickets: '', max_tickets: '', commission_percentage: '' });
       setEditingFilmId(null);
       fetchFilms();
       toast({
@@ -913,6 +1060,11 @@ const AdminPanel = () => {
       title: filmData.title ?? '',
       synopsis: filmData.synopsis ?? '',
       genres: Array.isArray(filmData.genres) ? filmData.genres.join(', ') : (filmData.genres ?? ''),
+      ticket_expiry_hours: filmData.ticket_expiry_hours ? filmData.ticket_expiry_hours.toString() : '',
+      platform_fee_percentage: filmData.platform_fee_percentage ? filmData.platform_fee_percentage.toString() : '',
+      gst_on_platform_fee: filmData.gst_on_platform_fee ? filmData.gst_on_platform_fee.toString() : '',
+      commission_fee_percentage: filmData.commission_fee_percentage ? filmData.commission_fee_percentage.toString() : '',
+      gst_on_commission_fee: filmData.gst_on_commission_fee ? filmData.gst_on_commission_fee.toString() : '',
       trailer_thumbnail: filmData.trailer_thumbnail ?? '',
       film_thumbnail_fullsize: filmData.film_thumbnail_fullsize ?? '',
       film_thumbnail_vertical: filmData.film_thumbnail_vertical ?? '',
@@ -942,9 +1094,27 @@ const AdminPanel = () => {
           
           return `${year}-${month}-${day}T${hours}:${minutes}`;
         })() : '',
+      closure_expiry_date: filmData.closure_expiry_date ?? '',
       is_published: filmData.is_published ?? false,
     });
     setEditingFilmId(filmData.id);
+    
+    // Load commission slabs for this film
+    const { data: slabs } = await supabase
+      .from('commission_slabs')
+      .select('*')
+      .eq('film_id', filmData.id)
+      .order('min_tickets', { ascending: true });
+    
+    if (slabs) {
+      setCommissionSlabs(slabs.map(slab => ({
+        id: slab.id,
+        min_tickets: slab.min_tickets.toString(),
+        max_tickets: slab.max_tickets ? slab.max_tickets.toString() : '',
+        commission_percentage: slab.commission_percentage.toString()
+      })));
+    }
+    
     fetchFilmSubmissions();
     setShowFilmModal(true);
   }
@@ -1946,21 +2116,51 @@ const AdminPanel = () => {
                       <Input placeholder="Expiry Date" type="date" value={filmForm.film_expiry_date ? filmForm.film_expiry_date.slice(0, 10) : ""} onChange={e => setFilmForm(f => ({ ...f, film_expiry_date: e.target.value }))} />
                     </div>
                     <div>
-                      <label className="block mb-1 mt-2">Scheduled Release Date & Time (IST)</label>
+                      <label className="block mb-1 mt-2">Scheduled Release Date & Time (IST) <span className="text-gray-400 font-normal">(Optional)</span></label>
+                      <div className="flex gap-2">
+                        <Input 
+                          type="datetime-local" 
+                          value={filmForm.scheduled_release_datetime || ""} 
+                          onChange={e => setFilmForm(f => ({ ...f, scheduled_release_datetime: e.target.value }))} 
+                          className="[color-scheme:dark] flex-1"
+                          placeholder=""
+                          min={filmForm.scheduled_release_datetime ? (() => {
+                            // Only apply minimum when there's a value
+                            const now = new Date();
+                            // Add 5.5 hours to convert to IST
+                            const istNow = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+                            return istNow.toISOString().slice(0, 16);
+                          })() : undefined}
+                        />
+                        {filmForm.scheduled_release_datetime && (
+                          <Button 
+                            type="button"
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => setFilmForm(f => ({ ...f, scheduled_release_datetime: '' }))}
+                            className="px-3"
+                          >
+                            Clear
+                          </Button>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">Optional: Enter date and time in IST to schedule automatic release. Leave empty to publish immediately when saved.</p>
+                    </div>
+                    <div>
+                      <label className="block mb-1 mt-2">Closure Expiry Date</label>
                       <Input 
-                        type="datetime-local" 
-                        value={filmForm.scheduled_release_datetime || ""} 
-                        onChange={e => setFilmForm(f => ({ ...f, scheduled_release_datetime: e.target.value }))} 
+                        type="date" 
+                        value={filmForm.closure_expiry_date || ""} 
+                        onChange={e => setFilmForm(f => ({ ...f, closure_expiry_date: e.target.value }))} 
                         className="[color-scheme:dark]"
                         min={(() => {
-                          // Set minimum to current IST time
-                          const now = new Date();
-                          // Add 5.5 hours to convert to IST
-                          const istNow = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
-                          return istNow.toISOString().slice(0, 16);
+                          // Set minimum to tomorrow's date
+                          const tomorrow = new Date();
+                          tomorrow.setDate(tomorrow.getDate() + 1);
+                          return tomorrow.toISOString().split('T')[0];
                         })()}
                       />
-                      <p className="text-xs text-gray-500 mt-1">Enter date and time in Indian Standard Time (IST). Film will automatically go live at this time.</p>
+                      <p className="text-xs text-gray-500 mt-1">Date when the film will automatically be removed from public view (end of day IST).</p>
                     </div>
                     <div>
                       <label className="block mb-1 mt-2">Quality</label>
@@ -2091,6 +2291,245 @@ const AdminPanel = () => {
                     </div>
                     <div>
                       <Input placeholder="Ticket Price" type="text" inputMode="decimal" pattern="[0-9]*" value={filmForm.ticket_price} onChange={e => setFilmForm(f => ({ ...f, ticket_price: e.target.value.replace(/[^0-9.]/g, '') }))} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
+                    <div className="text-sm text-gray-400">
+                      <label htmlFor="ticket_expiry_hours">Ticket Expiry Duration (hours)</label>
+                      <p className="text-xs text-gray-500 mt-1">Default: 24 hours if not specified. Min: 1 hour, Max: 168 hours (7 days)</p>
+                    </div>
+                    <div>
+                      <Input 
+                        id="ticket_expiry_hours"
+                        placeholder="24" 
+                        type="text" 
+                        inputMode="numeric" 
+                        pattern="[0-9]*" 
+                        min="1"
+                        max="168"
+                        value={filmForm.ticket_expiry_hours} 
+                        onChange={e => {
+                          const value = e.target.value.replace(/[^0-9]/g, '');
+                          const numValue = parseInt(value);
+                          if (value === '' || (numValue >= 1 && numValue <= 168)) {
+                            setFilmForm(f => ({ ...f, ticket_expiry_hours: value }));
+                          }
+                        }} 
+                      />
+                    </div>
+                  </div>
+
+                  {/* Financial Configuration Section */}
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="text-green-400 w-5 h-5" />
+                    <h4 className="font-semibold text-lg">Financial Configuration</h4>
+                    <div className="flex-1 border-b border-gray-700 ml-2" />
+                  </div>
+                  
+                  {/* Platform Fee */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
+                    <div className="text-sm text-gray-400">
+                      <label htmlFor="platform_fee_percentage">Platform Fee (%)</label>
+                      <p className="text-xs text-gray-500 mt-1">Platform fee percentage on ticket sales (0-100%)</p>
+                    </div>
+                    <div>
+                      <Input 
+                        id="platform_fee_percentage"
+                        placeholder="0.00" 
+                        type="text" 
+                        inputMode="decimal" 
+                        pattern="[0-9.]*" 
+                        value={filmForm.platform_fee_percentage} 
+                        onChange={e => {
+                          const value = e.target.value.replace(/[^0-9.]/g, '');
+                          const numValue = parseFloat(value);
+                          if (value === '' || (!isNaN(numValue) && numValue >= 0 && numValue <= 100)) {
+                            setFilmForm(f => ({ ...f, platform_fee_percentage: value }));
+                          }
+                        }} 
+                      />
+                    </div>
+                  </div>
+
+                  {/* GST on Platform Fee */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
+                    <div className="text-sm text-gray-400">
+                      <label htmlFor="gst_on_platform_fee">GST on Platform Fee (%)</label>
+                      <p className="text-xs text-gray-500 mt-1">GST percentage applied on platform fee (0-100%)</p>
+                    </div>
+                    <div>
+                      <Input 
+                        id="gst_on_platform_fee"
+                        placeholder="0.00" 
+                        type="text" 
+                        inputMode="decimal" 
+                        pattern="[0-9.]*" 
+                        value={filmForm.gst_on_platform_fee} 
+                        onChange={e => {
+                          const value = e.target.value.replace(/[^0-9.]/g, '');
+                          const numValue = parseFloat(value);
+                          if (value === '' || (!isNaN(numValue) && numValue >= 0 && numValue <= 100)) {
+                            setFilmForm(f => ({ ...f, gst_on_platform_fee: value }));
+                          }
+                        }} 
+                      />
+                    </div>
+                  </div>
+
+                  {/* Commission Fee */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
+                    <div className="text-sm text-gray-400">
+                      <label htmlFor="commission_fee_percentage">Base Commission Fee (%)</label>
+                      <p className="text-xs text-gray-500 mt-1">Base commission percentage (can be overridden by slabs)</p>
+                    </div>
+                    <div>
+                      <Input 
+                        id="commission_fee_percentage"
+                        placeholder="0.00" 
+                        type="text" 
+                        inputMode="decimal" 
+                        pattern="[0-9.]*" 
+                        value={filmForm.commission_fee_percentage} 
+                        onChange={e => {
+                          const value = e.target.value.replace(/[^0-9.]/g, '');
+                          const numValue = parseFloat(value);
+                          if (value === '' || (!isNaN(numValue) && numValue >= 0 && numValue <= 100)) {
+                            setFilmForm(f => ({ ...f, commission_fee_percentage: value }));
+                          }
+                        }} 
+                      />
+                    </div>
+                  </div>
+
+                  {/* GST on Commission Fee */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
+                    <div className="text-sm text-gray-400">
+                      <label htmlFor="gst_on_commission_fee">GST on Commission Fee (%)</label>
+                      <p className="text-xs text-gray-500 mt-1">GST percentage applied on commission fee (0-100%)</p>
+                    </div>
+                    <div>
+                      <Input 
+                        id="gst_on_commission_fee"
+                        placeholder="0.00" 
+                        type="text" 
+                        inputMode="decimal" 
+                        pattern="[0-9.]*" 
+                        value={filmForm.gst_on_commission_fee} 
+                        onChange={e => {
+                          const value = e.target.value.replace(/[^0-9.]/g, '');
+                          const numValue = parseFloat(value);
+                          if (value === '' || (!isNaN(numValue) && numValue >= 0 && numValue <= 100)) {
+                            setFilmForm(f => ({ ...f, gst_on_commission_fee: value }));
+                          }
+                        }} 
+                      />
+                    </div>
+                  </div>
+
+                  {/* Commission Slabs Configuration */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <BarChart3 className="text-purple-400 w-5 h-5" />
+                      <h4 className="font-semibold text-lg">Commission Slabs</h4>
+                      <div className="flex-1 border-b border-gray-700 ml-2" />
+                    </div>
+                    
+                    {/* Existing Commission Slabs */}
+                    {commissionSlabs.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-sm text-gray-400">Current Commission Slabs:</p>
+                        {commissionSlabs.map((slab, index) => (
+                          <div key={index} className="flex items-center gap-3 bg-gray-800/80 rounded-xl p-3">
+                            <div className="flex-1 grid grid-cols-3 gap-3 text-sm">
+                              <div>
+                                <span className="text-gray-400">Min: </span>
+                                <span className="text-white">{slab.min_tickets}</span>
+                              </div>
+                              <div>
+                                <span className="text-gray-400">Max: </span>
+                                <span className="text-white">{slab.max_tickets || 'Unlimited'}</span>
+                              </div>
+                              <div>
+                                <span className="text-gray-400">Commission: </span>
+                                <span className="text-white">{slab.commission_percentage}%</span>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeCommissionSlab(index)}
+                              className="text-red-400 hover:text-red-300 p-1"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Add New Commission Slab */}
+                    <div className="space-y-3">
+                      <p className="text-sm text-gray-400">Add New Commission Slab:</p>
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                        <div>
+                          <label className="text-xs text-gray-500">Min Tickets</label>
+                          <Input
+                            placeholder="0"
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            value={newSlab.min_tickets}
+                            onChange={e => {
+                              const value = e.target.value.replace(/[^0-9]/g, '');
+                              setNewSlab(prev => ({ ...prev, min_tickets: value }));
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-500">Max Tickets (Optional)</label>
+                          <Input
+                            placeholder="100"
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            value={newSlab.max_tickets}
+                            onChange={e => {
+                              const value = e.target.value.replace(/[^0-9]/g, '');
+                              setNewSlab(prev => ({ ...prev, max_tickets: value }));
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-500">Commission %</label>
+                          <Input
+                            placeholder="10.00"
+                            type="text"
+                            inputMode="decimal"
+                            pattern="[0-9.]*"
+                            value={newSlab.commission_percentage}
+                            onChange={e => {
+                              const value = e.target.value.replace(/[^0-9.]/g, '');
+                              const numValue = parseFloat(value);
+                              if (value === '' || (!isNaN(numValue) && numValue >= 0 && numValue <= 100)) {
+                                setNewSlab(prev => ({ ...prev, commission_percentage: value }));
+                              }
+                            }}
+                          />
+                        </div>
+                        <div className="flex items-end">
+                          <Button
+                            type="button"
+                            onClick={addCommissionSlab}
+                            className="w-full bg-purple-600 hover:bg-purple-700"
+                            disabled={!newSlab.min_tickets || !newSlab.commission_percentage}
+                          >
+                            <Plus className="w-4 h-4 mr-1" />
+                            Add Slab
+                          </Button>
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        Leave "Max Tickets" empty for unlimited upper range. Commission slabs cannot overlap.
+                      </p>
                     </div>
                   </div>
 
@@ -2414,6 +2853,80 @@ const AdminPanel = () => {
       fetchFilms();
     }
   }, [showBannerModal]);
+
+  // Commission slab management functions
+  const addCommissionSlab = () => {
+    const minTickets = parseInt(newSlab.min_tickets);
+    const maxTickets = newSlab.max_tickets ? parseInt(newSlab.max_tickets) : null;
+    const commissionPercentage = parseFloat(newSlab.commission_percentage);
+
+    // Validation
+    if (isNaN(minTickets) || minTickets < 0) {
+      toast({
+        title: "Invalid input",
+        description: "Minimum tickets must be a valid positive number",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (maxTickets !== null && (isNaN(maxTickets) || maxTickets < minTickets)) {
+      toast({
+        title: "Invalid input", 
+        description: "Maximum tickets must be greater than or equal to minimum tickets",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isNaN(commissionPercentage) || commissionPercentage < 0 || commissionPercentage > 100) {
+      toast({
+        title: "Invalid input",
+        description: "Commission percentage must be between 0 and 100",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check for overlapping ranges (adjacent ranges are allowed)
+    const overlapping = commissionSlabs.some(slab => {
+      const slabMin = parseInt(slab.min_tickets);
+      const slabMax = slab.max_tickets ? parseInt(slab.max_tickets) : Infinity;
+      const newMax = maxTickets || Infinity;
+      
+      // Ranges overlap if they have any ticket numbers in common
+      // They DON'T overlap if: newMax < slabMin OR slabMax < minTickets
+      // So they DO overlap if: NOT (newMax < slabMin OR slabMax < minTickets)
+      return !(newMax < slabMin || slabMax < minTickets);
+    });
+
+    if (overlapping) {
+      toast({
+        title: "Overlapping range",
+        description: "Commission slab ranges cannot overlap",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Add the new slab
+    const newSlabData = {
+      id: `temp_${Date.now()}`, // Temporary ID for new slabs
+      min_tickets: newSlab.min_tickets,
+      max_tickets: newSlab.max_tickets,
+      commission_percentage: newSlab.commission_percentage
+    };
+
+    setCommissionSlabs([...commissionSlabs, newSlabData].sort((a, b) => 
+      parseInt(a.min_tickets) - parseInt(b.min_tickets)
+    ));
+    setNewSlab({ min_tickets: '', max_tickets: '', commission_percentage: '' });
+  };
+
+  const removeCommissionSlab = (index: number) => {
+    const updatedSlabs = commissionSlabs.filter((_, i) => i !== index);
+    setCommissionSlabs(updatedSlabs);
+  };
 
   return (
     <div className="min-h-screen bg-tiketx-navy">

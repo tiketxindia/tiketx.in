@@ -53,12 +53,14 @@ const Home = () => {
     // Fetch movies by section (example: Now Showing, Action Picks, Short Films)
     setFilmsLoading(true);
     const currentTime = new Date().toISOString();
+    const currentDate = new Date().toISOString().split('T')[0]; // Get current date in YYYY-MM-DD format
     
     supabase
       .from("films")
       .select("*")
       .eq('is_published', true)
       .or(`scheduled_release_datetime.is.null,scheduled_release_datetime.lte.${currentTime}`)
+      .or(`closure_expiry_date.is.null,closure_expiry_date.gte.${currentDate}`)
       .then(({ data, error }) => {
         if (!error && data) {
           setAllFilms(data);
@@ -114,28 +116,38 @@ const Home = () => {
         // setUserTickets({}); // This line is no longer needed
       }
     });
-    // Set up Realtime subscription for film publication events
+    // Helper function to refresh films with proper filtering
+    const refreshFilms = () => {
+      const currentTime = new Date().toISOString();
+      const currentDate = new Date().toISOString().split('T')[0];
+      supabase
+        .from("films")
+        .select("*")
+        .eq('is_published', true)
+        .or(`scheduled_release_datetime.is.null,scheduled_release_datetime.lte.${currentTime}`)
+        .or(`closure_expiry_date.is.null,closure_expiry_date.gte.${currentDate}`)
+        .then(({ data, error }) => {
+          if (!error && data) {
+            setAllFilms(data);
+            setLatestReleases(data.filter(m => m.type === "movie"));
+            setActionPicks(data.filter(m => m.genre === "Action"));
+            setShortFilms(data.filter(m => m.type === "short"));
+            const genres = Array.from(new Set(data.map(m => m.genre)));
+            setCategories(genres);
+          }
+        });
+    };
+
+    // Set up Realtime subscription for film events
     const filmChannel = supabase
-      .channel('film_publications')
+      .channel('film_events')
       .on('broadcast', { event: 'film_published' }, (payload) => {
         console.log('Film published event received:', payload);
-        // Refresh the films list when a film is published
-        const currentTime = new Date().toISOString();
-        supabase
-          .from("films")
-          .select("*")
-          .eq('is_published', true)
-          .or(`scheduled_release_datetime.is.null,scheduled_release_datetime.lte.${currentTime}`)
-          .then(({ data, error }) => {
-            if (!error && data) {
-              setAllFilms(data);
-              setLatestReleases(data.filter(m => m.type === "movie"));
-              setActionPicks(data.filter(m => m.genre === "Action"));
-              setShortFilms(data.filter(m => m.type === "short"));
-              const genres = Array.from(new Set(data.map(m => m.genre)));
-              setCategories(genres);
-            }
-          });
+        refreshFilms();
+      })
+      .on('broadcast', { event: 'film_closed' }, (payload) => {
+        console.log('Film closed event received:', payload);
+        refreshFilms();
       })
       .subscribe();
 

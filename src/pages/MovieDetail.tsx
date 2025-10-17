@@ -1,6 +1,6 @@
 
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Play, Calendar, Lock, Globe, ShieldCheck, Clock } from 'lucide-react';
+import { ChevronLeft, Play, Calendar, Lock, Globe, ShieldCheck, Clock, Info } from 'lucide-react';
 import { EpisodeList } from '@/components/EpisodeList';
 import { CastList } from '@/components/CastList';
 import { useEffect, useState, useRef } from 'react';
@@ -12,6 +12,8 @@ import { format } from 'date-fns';
 import Confetti from 'react-confetti';
 import { useUserTickets } from '@/hooks/useUserTickets';
 import { LoginSignupModal } from '@/components/LoginSignupModal';
+import { calculateTicketFees, getFeeDisplayItems, rupeesToPaise, type FeeBreakdown } from '@/lib/feeCalculations';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const MovieDetail = () => {
   const { id } = useParams();
@@ -29,6 +31,7 @@ const MovieDetail = () => {
   const [showConfetti, setShowConfetti] = useState(false);
   const { refreshTickets } = useUserTickets();
   const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [feeBreakdown, setFeeBreakdown] = useState<FeeBreakdown | null>(null);
 
   // Check for valid ticket on mount and after purchase
   useEffect(() => {
@@ -61,6 +64,20 @@ const MovieDetail = () => {
       }
     }
     checkTicket();
+  }, [film]);
+
+  // Calculate fee breakdown when film data changes
+  useEffect(() => {
+    if (film?.ticket_price) {
+      const breakdown = calculateTicketFees(
+        film.ticket_price,
+        film.platform_fee_percentage || 0,
+        film.gst_on_platform_fee || 0
+      );
+      setFeeBreakdown(breakdown);
+    } else {
+      setFeeBreakdown(null);
+    }
   }, [film]);
 
   useEffect(() => {
@@ -192,7 +209,8 @@ const MovieDetail = () => {
   }
 
   return (
-    <div className="min-h-screen">
+    <TooltipProvider>
+      <div className="min-h-screen">
       {/* Header */}
       <div className="flex items-center justify-between p-6">
         <button 
@@ -415,12 +433,66 @@ const MovieDetail = () => {
           >
             <div className="bg-black/90 w-full max-w-none rounded-t-2xl rounded-b-none flex items-center justify-between shadow-2xl px-4 py-2 pb-6 pt-5 pointer-events-auto md:w-full md:mx-0 md:static md:translate-x-0 md:left-0 md:w-full fixed left-1/2 -translate-x-1/2 w-11/12 bottom-20 z-[60] mx-0 md:mb-0 mb-0" >
               <div className="flex flex-col">
-                <span className="text-sm text-gray-300">
-                  Ticket Price
-                </span>
-                <span className="font-bold text-tiketx-blue leading-tight text-2xl md:text-3xl">
-                  {film.ticket_price ? `Rs.${film.ticket_price}` : ''}
-                </span>
+                {feeBreakdown ? (
+                  <>
+                    {/* Clean display with tooltip */}
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-sm text-gray-300">
+                        Ticket Price
+                      </span>
+                    </div>
+                    
+                    {/* Main pricing display */}
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-bold text-tiketx-blue leading-tight text-2xl md:text-3xl">
+                        ₹{feeBreakdown.basePrice.toFixed(0)}
+                      </span>
+                      {(feeBreakdown.platformFee > 0 || feeBreakdown.gstOnPlatformFee > 0) && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-sm text-gray-300 font-medium">
+                            + Convenience Fee
+                          </span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="w-3 h-3 text-gray-400 hover:text-gray-300 cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="bg-gray-800 border-gray-700 text-white max-w-xs">
+                              <div className="space-y-2">
+                                <p className="text-xs text-gray-300 mb-2">
+                                  This includes the platform fee and applicable GST.
+                                </p>
+                                <div className="space-y-1">
+                                  <div className="flex justify-between text-xs">
+                                    <span>Base Amount:</span>
+                                    <span>₹{feeBreakdown.platformFee.toFixed(2)}</span>
+                                  </div>
+                                  <div className="flex justify-between text-xs">
+                                    <span>Integrated GST @18%:</span>
+                                    <span>₹{feeBreakdown.gstOnPlatformFee.toFixed(2)}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Total amount below */}
+                    <div className="text-xs text-gray-400 mt-1">
+                      Total: {feeBreakdown.displayBreakdown.totalAmount}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-sm text-gray-300">
+                      Ticket Price
+                    </span>
+                    <span className="font-bold text-tiketx-blue leading-tight text-2xl md:text-3xl">
+                      {film?.ticket_price ? `Rs.${film.ticket_price}` : ''}
+                    </span>
+                  </>
+                )}
               </div>
               <button
                 className="gradient-button text-base px-6 py-3 font-bold rounded-2xl mx-4"
@@ -431,15 +503,19 @@ const MovieDetail = () => {
                     setLoginModalOpen(true);
                     return;
                   }
+                  // Use total amount including fees for payment
+                  const paymentAmount = feeBreakdown ? feeBreakdown.totalAmount : film.ticket_price;
                   openRazorpayModal({
-                    amount: film.ticket_price * 100, // Razorpay expects paise
+                    amount: rupeesToPaise(paymentAmount),
                     name: film.title,
                     description: 'Movie Ticket',
                     order_id: undefined, // Optionally pass order_id from backend
                     onSuccess: async (response) => {
                       // On payment success, deactivate previous tickets and insert new one
                       const purchaseDate = new Date();
-                      const expiryDate = new Date(purchaseDate.getTime() + 24 * 60 * 60 * 1000); // 24 hours from now
+                      // Use film's custom ticket_expiry_hours or default to 24 hours
+                      const expiryHours = film.ticket_expiry_hours || 24;
+                      const expiryDate = new Date(purchaseDate.getTime() + expiryHours * 60 * 60 * 1000);
                       const tiketId = await generateUniqueTiketId();
                       // 1. Set is_active=false for all previous tickets for this user and film
                       await supabase.from('film_tickets')
@@ -447,16 +523,31 @@ const MovieDetail = () => {
                         .eq('user_id', user.id)
                         .eq('film_id', film.id)
                         .eq('is_active', true);
-                      // 2. Insert new ticket with is_active=true
-                      const { error } = await supabase.from('film_tickets').insert({
+                      // 2. Insert new ticket with is_active=true and fee breakdown
+                      const ticketData: any = {
                         user_id: user.id,
                         film_id: film.id,
                         purchase_date: purchaseDate.toISOString(),
                         expiry_date: expiryDate.toISOString(),
-                        price: film.ticket_price,
+                        price: film.ticket_price, // Keep for backward compatibility
                         is_active: true,
                         tiket_id: tiketId,
-                      });
+                      };
+
+                      // Add fee breakdown if available
+                      if (feeBreakdown) {
+                        ticketData.base_price = feeBreakdown.basePrice;
+                        ticketData.platform_fee = feeBreakdown.platformFee;
+                        ticketData.gst_on_platform_fee = feeBreakdown.gstOnPlatformFee;
+                        ticketData.total_amount_paid = feeBreakdown.totalAmount;
+                      } else {
+                        ticketData.base_price = film.ticket_price;
+                        ticketData.platform_fee = 0;
+                        ticketData.gst_on_platform_fee = 0;
+                        ticketData.total_amount_paid = film.ticket_price;
+                      }
+
+                      const { error } = await supabase.from('film_tickets').insert(ticketData);
                       if (error) {
                         alert('Failed to save ticket: ' + error.message);
                       } else {
@@ -605,6 +696,7 @@ const MovieDetail = () => {
       )}
       <LoginSignupModal open={loginModalOpen} onOpenChange={setLoginModalOpen} />
     </div>
+    </TooltipProvider>
   );
 };
 

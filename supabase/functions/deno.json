@@ -1,0 +1,12 @@
+{
+  "imports": {
+    "@supabase/supabase-js": "jsr:@supabase/supabase-js@2",
+    "@supabase/functions-js": "jsr:@supabase/functions-js@2"
+  },
+  "compilerOptions": {
+    "types": [
+      "https://edge-runtime.supabase.com/esm/types/deno.d.ts"
+    ],
+    "lib": ["deno.window", "es2022"]
+  }
+}
