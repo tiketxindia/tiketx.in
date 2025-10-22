@@ -19,21 +19,23 @@ export interface FeeBreakdown {
  * @param basePrice - The base ticket price set by the creator
  * @param platformFeePercentage - Platform fee percentage (0-100)
  * @param gstOnPlatformFeePercentage - GST percentage on platform fee (0-100)
+ * @param disableGst - If true, GST calculations are skipped
  * @returns Complete fee breakdown with amounts and display strings
  */
 export function calculateTicketFees(
   basePrice: number,
   platformFeePercentage: number = 0,
-  gstOnPlatformFeePercentage: number = 0
+  gstOnPlatformFeePercentage: number = 0,
+  disableGst: boolean = false
 ): FeeBreakdown {
   // Convert percentages to decimals
   const platformFeeRate = platformFeePercentage / 100;
-  const gstRate = gstOnPlatformFeePercentage / 100;
+  const gstRate = disableGst ? 0 : (gstOnPlatformFeePercentage / 100);
   
   // Calculate platform fee on base price
   const platformFee = basePrice * platformFeeRate;
   
-  // Calculate GST on the platform fee (not on base price)
+  // Calculate GST on the platform fee (skip if GST is disabled)
   const gstOnPlatformFee = platformFee * gstRate;
   
   // Total amount = base price + platform fee + GST on platform fee
@@ -74,9 +76,10 @@ export function rupeesToPaise(rupees: number): number {
 /**
  * Get fee breakdown summary for display in UI
  * @param breakdown - Fee breakdown object
+ * @param disableGst - If true, GST-related items are hidden
  * @returns Array of fee line items for display
  */
-export function getFeeDisplayItems(breakdown: FeeBreakdown) {
+export function getFeeDisplayItems(breakdown: FeeBreakdown, disableGst: boolean = false) {
   const items = [
     {
       label: 'Ticket Price',
@@ -94,8 +97,8 @@ export function getFeeDisplayItems(breakdown: FeeBreakdown) {
     });
   }
   
-  // Only show GST if it's greater than 0
-  if (breakdown.gstOnPlatformFee > 0) {
+  // Only show GST if it's greater than 0 AND GST is not disabled
+  if (breakdown.gstOnPlatformFee > 0 && !disableGst) {
     items.push({
       label: 'GST on Platform Fee',
       amount: breakdown.displayBreakdown.gstOnPlatformFee,

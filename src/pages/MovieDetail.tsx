@@ -72,7 +72,8 @@ const MovieDetail = () => {
       const breakdown = calculateTicketFees(
         film.ticket_price,
         film.platform_fee_percentage || 0,
-        film.gst_on_platform_fee || 0
+        film.gst_on_platform_fee || 0,
+        film.disable_gst || false
       );
       setFeeBreakdown(breakdown);
     } else {
@@ -447,7 +448,7 @@ const MovieDetail = () => {
                       <span className="font-bold text-tiketx-blue leading-tight text-2xl md:text-3xl">
                         ₹{feeBreakdown.basePrice.toFixed(0)}
                       </span>
-                      {(feeBreakdown.platformFee > 0 || feeBreakdown.gstOnPlatformFee > 0) && (
+                      {(feeBreakdown.platformFee > 0 || (feeBreakdown.gstOnPlatformFee > 0 && !film.disable_gst)) && (
                         <div className="flex items-center gap-1">
                           <span className="text-sm text-gray-300 font-medium">
                             + Convenience Fee
@@ -459,17 +460,19 @@ const MovieDetail = () => {
                             <TooltipContent side="top" className="bg-gray-800 border-gray-700 text-white max-w-xs">
                               <div className="space-y-2">
                                 <p className="text-xs text-gray-300 mb-2">
-                                  This includes the platform fee and applicable GST.
+                                  This includes the platform fee and applicable charges.
                                 </p>
                                 <div className="space-y-1">
                                   <div className="flex justify-between text-xs">
                                     <span>Base Amount:</span>
                                     <span>₹{feeBreakdown.platformFee.toFixed(2)}</span>
                                   </div>
-                                  <div className="flex justify-between text-xs">
-                                    <span>Integrated GST @18%:</span>
-                                    <span>₹{feeBreakdown.gstOnPlatformFee.toFixed(2)}</span>
-                                  </div>
+                                  {!film.disable_gst && feeBreakdown.gstOnPlatformFee > 0 && (
+                                    <div className="flex justify-between text-xs">
+                                      <span>Integrated GST @18%:</span>
+                                      <span>₹{feeBreakdown.gstOnPlatformFee.toFixed(2)}</span>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             </TooltipContent>
@@ -536,12 +539,10 @@ const MovieDetail = () => {
 
                       // Add fee breakdown if available
                       if (feeBreakdown) {
-                        ticketData.base_price = feeBreakdown.basePrice;
                         ticketData.platform_fee = feeBreakdown.platformFee;
                         ticketData.gst_on_platform_fee = feeBreakdown.gstOnPlatformFee;
                         ticketData.total_amount_paid = feeBreakdown.totalAmount;
                       } else {
-                        ticketData.base_price = film.ticket_price;
                         ticketData.platform_fee = 0;
                         ticketData.gst_on_platform_fee = 0;
                         ticketData.total_amount_paid = film.ticket_price;

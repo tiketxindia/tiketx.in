@@ -228,7 +228,7 @@ function CreatorDashboard() {
       // Get the film associated with this submission
       const { data: films, error: filmError } = await supabase
         .from('films')
-        .select('id, title')
+        .select('id, title, disable_gst')
         .eq('submission_id', submissionId);
 
       if (filmError || !films || films.length === 0) {
@@ -236,17 +236,21 @@ function CreatorDashboard() {
         setSalesData({
           ticketsSold: 0,
           totalRevenue: 0,
+          netRevenue: 0,
+          totalCommission: 0,
           tickets: [],
           currency,
-          currencySymbol
+          currencySymbol,
+          disableGst: false
         });
         setLoadingSalesData(false);
         return;
       }
 
       const filmId = films[0].id;
+      const filmDisableGst = films[0].disable_gst || false;
 
-      // Fetch ticket sales data
+      // Fetch ticket sales data with commission information
       const { data: tickets, error: ticketsError } = await supabase
         .from('film_tickets')
         .select('*')
@@ -258,21 +262,31 @@ function CreatorDashboard() {
         setSalesData({
           ticketsSold: 0,
           totalRevenue: 0,
+          netRevenue: 0,
+          totalCommission: 0,
           tickets: [],
           currency,
-          currencySymbol
+          currencySymbol,
+          disableGst: filmDisableGst
         });
       } else {
         const ticketData = tickets || [];
         const ticketsSold = ticketData.length;
-        const totalRevenue = ticketData.reduce((sum, ticket) => sum + (ticket.price || 0), 0);
+        const totalRevenue = ticketData.reduce((sum, ticket) => sum + (parseFloat(ticket.price) || 0), 0);
+        
+        // Calculate commission totals directly from stored data (including GST)
+        const totalCommission = ticketData.reduce((sum, ticket) => sum + (parseFloat(ticket.total_commission_with_gst) || 0), 0);
+        const netRevenue = ticketData.reduce((sum, ticket) => sum + (parseFloat(ticket.net_amount) || parseFloat(ticket.price) || 0), 0);
 
         setSalesData({
           ticketsSold,
           totalRevenue,
+          netRevenue,
+          totalCommission,
           tickets: ticketData,
           currency,
-          currencySymbol
+          currencySymbol,
+          disableGst: filmDisableGst
         });
       }
     } catch (error) {
@@ -280,12 +294,169 @@ function CreatorDashboard() {
       setSalesData({
         ticketsSold: 0,
         totalRevenue: 0,
+        netRevenue: 0,
+        totalCommission: 0,
         tickets: [],
         currency: 'INR',
-        currencySymbol: '₹'
+        currencySymbol: '₹',
+        disableGst: false
       });
     }
     setLoadingSalesData(false);
+  };
+
+  // Function to fetch weekly earnings data for payout
+  const fetchWeeklyEarnings = async (submissionId: string) => {
+    setLoadingPayoutData(true);
+    try {
+      // Get the film associated with this submission
+      const { data: films, error: filmError } = await supabase
+        .from('films')
+        .select('id, title, published_date')
+        .eq('submission_id', submissionId);
+
+      if (filmError || !films || films.length === 0) {
+        console.log('No film found for this submission');
+        setWeeklyEarnings([]);
+        setLoadingPayoutData(false);
+        return;
+      }
+
+      const filmId = films[0].id;
+
+      // Fetch weekly earnings breakdown
+      const { data: weeklyData, error: weeklyError } = await supabase
+        .rpc('get_weekly_earnings_breakdown', { film_id_param: filmId });
+
+      if (weeklyError) {
+        console.error('Error fetching weekly earnings:', weeklyError);
+        setWeeklyEarnings([]);
+      } else {
+        setWeeklyEarnings(weeklyData || []);
+      }
+    } catch (error) {
+      console.error('Error in fetchWeeklyEarnings:', error);
+      setWeeklyEarnings([]);
+    }
+    setLoadingPayoutData(false);
+  };
+
+  // Function to fetch payout eligibility and existing requests
+  const fetchPayoutData = async (submissionId: string) => {
+    setLoadingPayoutData(true);
+    try {
+      // Get the film associated with this submission
+      const { data: films, error: filmError } = await supabase
+        .from('films')
+        .select('id, title, published_date')
+        .eq('submission_id', submissionId);
+
+      if (filmError || !films || films.length === 0) {
+        console.log('No film found for this submission');
+        setWeeklyEarnings([]);
+        setPayoutRequests([]);
+        setCurrentPayoutEligibility(null);
+        setLoadingPayoutData(false);
+        return;
+      }
+
+      const filmId = films[0].id;
+
+      // Fetch current payout eligibility
+      const { data: eligibilityData, error: eligibilityError } = await supabase
+        .rpc('get_current_payout_eligibility', { p_film_id: filmId });
+
+      if (eligibilityError) {
+        console.error('Error fetching payout eligibility:', eligibilityError);
+      } else {
+        setCurrentPayoutEligibility(eligibilityData?.[0] || null);
+      }
+
+      // Fetch existing payout requests
+      const { data: requestsData, error: requestsError } = await supabase
+        .rpc('get_payout_requests', { p_film_id: filmId });
+
+      if (requestsError) {
+        console.error('Error fetching payout requests:', requestsError);
+      } else {
+        setPayoutRequests(requestsData || []);
+      }
+
+      // Fetch weekly earnings breakdown
+      const { data: weeklyData, error: weeklyError } = await supabase
+        .rpc('get_weekly_earnings_breakdown', { film_id_param: filmId });
+
+      if (weeklyError) {
+        console.error('Error fetching weekly earnings:', weeklyError);
+        setWeeklyEarnings([]);
+      } else {
+        setWeeklyEarnings(weeklyData || []);
+      }
+    } catch (error) {
+      console.error('Error in fetchPayoutData:', error);
+      setWeeklyEarnings([]);
+      setPayoutRequests([]);
+      setCurrentPayoutEligibility(null);
+    }
+    setLoadingPayoutData(false);
+  };
+
+  // Function to create a payout request
+  const createPayoutRequest = async (submissionId: string) => {
+    try {
+      // Get the film associated with this submission
+      const { data: films, error: filmError } = await supabase
+        .from('films')
+        .select('id')
+        .eq('submission_id', submissionId);
+
+      if (filmError || !films || films.length === 0) {
+        toast({
+          title: "Error",
+          description: "Film not found for this submission.",
+        });
+        return;
+      }
+
+      const filmId = films[0].id;
+
+      // Create payout request
+      const { data: requestData, error: requestError } = await supabase
+        .rpc('create_payout_request', { p_film_id: filmId, p_submission_id: submissionId });
+
+      if (requestError) {
+        console.error('Error creating payout request:', requestError);
+        toast({
+          title: "Error",
+          description: "Failed to create payout request. Please try again.",
+        });
+        return;
+      }
+
+      const result = requestData?.[0];
+      if (result?.status === 'error') {
+        toast({
+          title: "Error",
+          description: result.message,
+        });
+        return;
+      }
+
+      toast({
+        title: "Payout Request Created",
+        description: `Your payout request for ₹${result.total_amount} has been submitted successfully.`,
+      });
+
+      // Refresh payout data
+      await fetchPayoutData(submissionId);
+      
+    } catch (error) {
+      console.error('Error in createPayoutRequest:', error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred. Please try again.",
+      });
+    }
   };
 
   const { toast } = useToast();
@@ -324,17 +495,31 @@ function CreatorDashboard() {
   const [salesData, setSalesData] = useState<{
     ticketsSold: number;
     totalRevenue: number;
+    netRevenue: number;
+    totalCommission: number;
     tickets: any[];
     currency: string;
     currencySymbol: string;
+    disableGst: boolean;
   }>({
     ticketsSold: 0,
     totalRevenue: 0,
+    netRevenue: 0,
+    totalCommission: 0,
     tickets: [],
     currency: 'INR',
-    currencySymbol: '₹'
+    currencySymbol: '₹',
+    disableGst: false
   });
   const [loadingSalesData, setLoadingSalesData] = useState(false);
+
+  // Payout Request modal state
+  const [showPayoutModal, setShowPayoutModal] = useState(false);
+  const [activePayoutSubmissionId, setActivePayoutSubmissionId] = useState<string | null>(null);
+  const [weeklyEarnings, setWeeklyEarnings] = useState<any[]>([]);
+  const [loadingPayoutData, setLoadingPayoutData] = useState(false);
+  const [payoutRequests, setPayoutRequests] = useState<any[]>([]);
+  const [currentPayoutEligibility, setCurrentPayoutEligibility] = useState<any>(null);
 
   function handleStepComplete(idx: number) {
     setOnboardingSteps(steps => steps.map((step, i) => i === idx ? { ...step, completed: !step.completed } : step));
@@ -999,6 +1184,16 @@ function CreatorDashboard() {
                                         >
                                           View Sales
                                         </button>
+                                        <button
+                                          className="w-full px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 rounded-xl font-semibold text-white transition-all duration-200 hover:scale-105 shadow-lg"
+                                          onClick={() => {
+                                            setActivePayoutSubmissionId(s.id);
+                                            fetchPayoutData(s.id);
+                                            setShowPayoutModal(true);
+                                          }}
+                                        >
+                                          View Payout
+                                        </button>
                                         <div className="text-center">
                                           <button
                                             className="text-sm text-tiketx-blue hover:text-tiketx-violet underline decoration-dotted underline-offset-2 transition-colors duration-200"
@@ -1319,7 +1514,7 @@ function CreatorDashboard() {
               ) : (
                 <div className="space-y-8">
                   {/* Sales Insights Summary */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="bg-gradient-to-r from-tiketx-blue/20 to-tiketx-violet/20 rounded-2xl p-6 border border-tiketx-blue/30">
                       <div className="flex items-center space-x-4">
                         <div className="bg-tiketx-blue/30 rounded-full p-3">
@@ -1342,8 +1537,28 @@ function CreatorDashboard() {
                           </span>
                         </div>
                         <div>
-                          <h3 className="text-lg font-semibold text-white">Total Revenue</h3>
+                          <h3 className="text-lg font-semibold text-white">Gross Revenue</h3>
                           <p className="text-3xl font-bold text-tiketx-violet">{salesData.currencySymbol}{salesData.totalRevenue.toLocaleString()}</p>
+                          <p className="text-xs text-gray-400 mt-1">Before commissions</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-gradient-to-r from-green-400/20 to-green-600/20 rounded-2xl p-6 border border-green-500/30">
+                      <div className="flex items-center space-x-4">
+                        <div className="bg-green-500/30 rounded-full p-3 flex items-center justify-center w-14 h-14">
+                          <span className="text-2xl font-bold text-green-400">
+                            ₹
+                          </span>
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-semibold text-white">Net Revenue</h3>
+                          <p className="text-3xl font-bold text-green-400">{salesData.currencySymbol}{salesData.netRevenue.toLocaleString()}</p>
+                          {salesData.disableGst ? (
+                            <p className="text-xs text-gray-400 mt-1">Gross Revenue - Commission</p>
+                          ) : (
+                            <p className="text-xs text-gray-400 mt-1">Gross Revenue - Commission</p>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1373,7 +1588,11 @@ function CreatorDashboard() {
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Purchase Date</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Expiry Date</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Status</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Price</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Ticket Price</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                                {salesData.disableGst ? 'Commission' : 'Commission (incl GST)'}
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Your Earnings</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-700">
@@ -1420,11 +1639,246 @@ function CreatorDashboard() {
                                   <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-300">
                                     {salesData.currencySymbol}{ticket.price || 0}
                                   </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-300">
+                                    {salesData.disableGst ? (
+                                      <span className="text-orange-400 font-semibold">
+                                        {ticket.commission_rate ? `${(parseFloat(ticket.commission_rate) * 100).toFixed(0)}%` : '0%'} (₹{parseFloat(ticket.total_commission_with_gst || ticket.commission_amount || 0).toFixed(2)})
+                                      </span>
+                                    ) : (
+                                      <div className="flex flex-col">
+                                        <span className="text-orange-400 font-semibold">
+                                          {ticket.commission_rate ? `${(parseFloat(ticket.commission_rate) * 100).toFixed(0)}%` : '0%'} (₹{parseFloat(ticket.total_commission_with_gst || 0).toFixed(2)})
+                                        </span>
+                                        <span className="text-gray-400 text-xs">
+                                          ₹{parseFloat(ticket.commission_amount || 0).toFixed(2)} + ₹{parseFloat(ticket.commission_gst_amount || 0).toFixed(2)} GST
+                                        </span>
+                                      </div>
+                                    )}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-400">
+                                    {salesData.currencySymbol}{parseFloat(ticket.net_amount || ticket.price || 0).toFixed(2)}
+                                  </td>
                                 </tr>
                               );
                             })}
                           </tbody>
                         </table>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Payout Request Modal */}
+        {showPayoutModal && activePayoutSubmissionId && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 backdrop-blur-sm">
+            <div className="bg-black bg-opacity-90 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.85)] p-8 w-full max-w-6xl max-h-[95vh] overflow-y-auto relative border-2 border-gray-900" style={{ boxShadow: '0 8px 32px 0 rgba(0,0,0,0.85), 0 0 0 2px #23232a, 0 0 0 4px #35353c' }}>
+              <button
+                className="absolute top-6 right-6 text-gray-400 hover:text-gray-600 text-2xl z-10"
+                onClick={() => {
+                  setShowPayoutModal(false);
+                  setActivePayoutSubmissionId(null);
+                  setWeeklyEarnings([]);
+                  setPayoutRequests([]);
+                  setCurrentPayoutEligibility(null);
+                }}
+                aria-label="Close"
+              >
+                &times;
+              </button>
+
+              <h2 className="text-2xl md:text-3xl font-extrabold text-left mb-2 text-white tracking-tight">
+                Weekly Payout Request for <span className="bg-gradient-to-r from-tiketx-blue via-tiketx-violet to-tiketx-pink bg-clip-text text-transparent font-extrabold drop-shadow-lg">
+                  {submissions.find(f => f.id === activePayoutSubmissionId)?.film_title || ''}
+                </span>
+              </h2>
+              <div className="text-base text-gray-400 text-left mb-8 font-light">
+                Weekly earnings breakdown and payout eligibility
+              </div>
+
+              {loadingPayoutData ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-tiketx-blue"></div>
+                  <span className="ml-4 text-gray-300">Loading payout data...</span>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Summary Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="bg-gradient-to-r from-green-400/20 to-green-600/20 rounded-2xl p-6 border border-green-500/30">
+                      <h3 className="text-lg font-semibold text-white mb-2">Available for Payout</h3>
+                      <p className="text-3xl font-bold text-green-400">
+                        ₹{currentPayoutEligibility?.total_eligible_amount || '0.00'}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">Ready for payout</p>
+                    </div>
+                    
+                    <div className="bg-gradient-to-r from-yellow-400/20 to-yellow-600/20 rounded-2xl p-6 border border-yellow-500/30">
+                      <h3 className="text-lg font-semibold text-white mb-2">Pending Request</h3>
+                      <p className="text-3xl font-bold text-yellow-400">
+                        ₹{currentPayoutEligibility?.pending_amount || '0.00'}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {currentPayoutEligibility?.has_pending_request ? 'In progress' : 'None'}
+                      </p>
+                    </div>
+                    
+                    <div className="bg-gradient-to-r from-tiketx-blue/20 to-tiketx-violet/20 rounded-2xl p-6 border border-tiketx-blue/30">
+                      <h3 className="text-lg font-semibold text-white mb-2">Available Weeks</h3>
+                      <p className="text-3xl font-bold text-tiketx-blue">{currentPayoutEligibility?.weeks_available || 0}</p>
+                      <p className="text-xs text-gray-400 mt-1">Eligible weeks</p>
+                    </div>
+                  </div>
+
+                  {/* Payout Requests History */}
+                  {payoutRequests.length > 0 && (
+                    <div className="bg-gray-800/50 rounded-2xl border border-gray-700 overflow-hidden">
+                      <div className="px-6 py-4 bg-gray-800/70 border-b border-gray-700">
+                        <h3 className="text-xl font-semibold text-white">Payout Requests History</h3>
+                        <p className="text-sm text-gray-400">Track your payout request status</p>
+                      </div>
+                      
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead className="bg-gray-800/30">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Request Date</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Amount</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Weeks</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Period</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-700">
+                            {payoutRequests.map((request, index) => (
+                              <tr key={request.id} className={index % 2 === 0 ? 'bg-gray-800/20' : 'bg-gray-800/40'}>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                                  {new Date(request.requested_at).toLocaleDateString()}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-400">
+                                  ₹{parseFloat(request.request_amount || 0).toFixed(2)}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                                  {request.total_weeks_included} weeks
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                                  {new Date(request.week_start_date).toLocaleDateString()} - {new Date(request.week_end_date).toLocaleDateString()}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                    request.status === 'completed' 
+                                      ? 'bg-green-800/30 text-green-300 border border-green-700'
+                                      : request.status === 'approved'
+                                      ? 'bg-blue-800/30 text-blue-300 border border-blue-700'
+                                      : request.status === 'processing'
+                                      ? 'bg-purple-800/30 text-purple-300 border border-purple-700'
+                                      : request.status === 'rejected'
+                                      ? 'bg-red-800/30 text-red-300 border border-red-700'
+                                      : 'bg-yellow-800/30 text-yellow-300 border border-yellow-700'
+                                  }`}>
+                                    {request.status === 'completed' ? 'Paid' 
+                                      : request.status === 'approved' ? 'Approved'
+                                      : request.status === 'processing' ? 'Processing'
+                                      : request.status === 'rejected' ? 'Rejected'
+                                      : 'Pending'}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Weekly Breakdown Table */}
+                  <div className="bg-gray-800/50 rounded-2xl border border-gray-700 overflow-hidden">
+                    <div className="px-6 py-4 bg-gray-800/70 border-b border-gray-700">
+                      <h3 className="text-xl font-semibold text-white">Weekly Earnings Breakdown</h3>
+                      <p className="text-sm text-gray-400">Payouts are processed weekly for completed weeks</p>
+                    </div>
+                    
+                    {weeklyEarnings.length === 0 ? (
+                      <div className="px-6 py-12 text-center">
+                        <p className="text-gray-500">No earnings data available yet.</p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead className="bg-gray-800/30">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Week</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Period</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Tickets</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Gross Revenue</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Commission</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Net Earnings</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-700">
+                            {weeklyEarnings.map((week, index) => (
+                              <tr key={week.week_number} className={index % 2 === 0 ? 'bg-gray-800/20' : 'bg-gray-800/40'}>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-300">
+                                  Week {week.week_number}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                                  {new Date(week.week_start_date).toLocaleDateString()} - {new Date(week.week_end_date).toLocaleDateString()}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                                  {week.tickets_sold}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-300">
+                                  ₹{parseFloat(week.gross_revenue || 0).toFixed(2)}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-300">
+                                  ₹{parseFloat(week.total_commission || 0).toFixed(2)}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-400">
+                                  ₹{parseFloat(week.net_earnings || 0).toFixed(2)}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                    week.payout_status === 'eligible' 
+                                      ? 'bg-green-800/30 text-green-300 border border-green-700' 
+                                      : 'bg-yellow-800/30 text-yellow-300 border border-yellow-700'
+                                  }`}>
+                                    {week.payout_status === 'eligible' ? 'Eligible' : 'Pending'}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Payout Request Button */}
+                  <div className="flex justify-center pt-6 space-x-4">
+                    {currentPayoutEligibility?.has_pending_request ? (
+                      <div className="text-center">
+                        <div className="px-8 py-3 bg-yellow-600/30 border border-yellow-500 rounded-xl font-bold text-yellow-300">
+                          Payout Request Pending (₹{currentPayoutEligibility?.pending_amount || '0.00'})
+                        </div>
+                        <p className="text-xs text-gray-400 mt-2">Your request is being processed</p>
+                      </div>
+                    ) : currentPayoutEligibility?.total_eligible_amount > 0 ? (
+                      <button
+                        className="px-8 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 rounded-xl font-bold text-white shadow-lg transition-all duration-200 hover:scale-105"
+                        onClick={() => createPayoutRequest(activePayoutSubmissionId!)}
+                      >
+                        Create Payout Request (₹{currentPayoutEligibility?.total_eligible_amount || '0.00'})
+                      </button>
+                    ) : (
+                      <div className="text-center">
+                        <div className="px-8 py-3 bg-gray-600/30 border border-gray-500 rounded-xl font-bold text-gray-400">
+                          No Eligible Earnings Yet
+                        </div>
+                        <p className="text-xs text-gray-400 mt-2">Earnings become eligible after each week completes</p>
                       </div>
                     )}
                   </div>

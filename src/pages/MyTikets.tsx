@@ -113,12 +113,12 @@ const TicketCard = ({ ticket }) => {
                   </div>
                 </div>
                 {/* Fee Breakdown Section */}
-                {ticket.base_price && (parseFloat(ticket.platform_fee) > 0 || parseFloat(ticket.gst_on_platform_fee) > 0) ? (
+                {ticket.price && (parseFloat(ticket.platform_fee) > 0 || parseFloat(ticket.gst_on_platform_fee) > 0) ? (
                   <div className="space-y-2 mt-5 mb-5">
                     {/* Ticket Price */}
                     <div className="flex justify-between items-center">
                       <span className="text-gray-400 text-[9px] md:text-[13px] font-semibold">Ticket Price</span>
-                      <span className="text-white text-[9px] md:text-[13px] font-bold pr-6">₹ {parseFloat(ticket.base_price).toFixed(2)}</span>
+                      <span className="text-white text-[9px] md:text-[13px] font-bold pr-6">₹ {parseFloat(ticket.price).toFixed(2)}</span>
                     </div>
                     
                     {/* Convenience Fee - Collapsible */}
@@ -232,7 +232,7 @@ const MyTikets = () => {
       }
       const { data, error } = await supabase
         .from('film_tickets')
-        .select('id, film_id, purchase_date, expiry_date, is_active, price, base_price, platform_fee, gst_on_platform_fee, total_amount_paid, films:film_id(id, title, film_thumbnail_vertical, runtime, language, release_year, genres), tiket_id')
+        .select('id, film_id, purchase_date, expiry_date, is_active, price, platform_fee, gst_on_platform_fee, total_amount_paid, films:film_id(id, title, film_thumbnail_vertical, runtime, language, release_year, genres), tiket_id')
         .eq('user_id', userObj.id)
         .order('purchase_date', { ascending: false });
       if (!error && data) {

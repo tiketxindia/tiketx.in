@@ -285,6 +285,7 @@ const AdminPanel = () => {
     gst_on_platform_fee: '',
     commission_fee_percentage: '',
     gst_on_commission_fee: '',
+    disable_gst: false,
     film_expiry_date: '',
     closure_expiry_date: '',
     runtime: '',
@@ -728,9 +729,9 @@ const AdminPanel = () => {
     
     // Process financial fields
     const platformFeeValue = filmForm.platform_fee_percentage === "" ? null : Number(filmForm.platform_fee_percentage);
-    const gstOnPlatformFeeValue = filmForm.gst_on_platform_fee === "" ? null : Number(filmForm.gst_on_platform_fee);
+    const gstOnPlatformFeeValue = filmForm.disable_gst ? 0 : (filmForm.gst_on_platform_fee === "" ? null : Number(filmForm.gst_on_platform_fee));
     const commissionFeeValue = filmForm.commission_fee_percentage === "" ? null : Number(filmForm.commission_fee_percentage);
-    const gstOnCommissionFeeValue = filmForm.gst_on_commission_fee === "" ? null : Number(filmForm.gst_on_commission_fee);
+    const gstOnCommissionFeeValue = filmForm.disable_gst ? 0 : (filmForm.gst_on_commission_fee === "" ? null : Number(filmForm.gst_on_commission_fee));
 
     // Determine publication status based on scheduling rules
     let shouldBePublished = filmForm.is_published;
@@ -787,6 +788,7 @@ const AdminPanel = () => {
       gst_on_platform_fee: gstOnPlatformFeeValue,
       commission_fee_percentage: commissionFeeValue,
       gst_on_commission_fee: gstOnCommissionFeeValue,
+      disable_gst: filmForm.disable_gst,
       is_published: shouldBePublished,
     };
     // Remove file-related fields not in DB
@@ -1002,6 +1004,7 @@ const AdminPanel = () => {
         gst_on_platform_fee: '',
         commission_fee_percentage: '',
         gst_on_commission_fee: '',
+        disable_gst: false,
         film_expiry_date: '',
         closure_expiry_date: '',
         runtime: '',
@@ -1062,9 +1065,9 @@ const AdminPanel = () => {
       genres: Array.isArray(filmData.genres) ? filmData.genres.join(', ') : (filmData.genres ?? ''),
       ticket_expiry_hours: filmData.ticket_expiry_hours ? filmData.ticket_expiry_hours.toString() : '',
       platform_fee_percentage: filmData.platform_fee_percentage ? filmData.platform_fee_percentage.toString() : '',
-      gst_on_platform_fee: filmData.gst_on_platform_fee ? filmData.gst_on_platform_fee.toString() : '',
+      gst_on_platform_fee: filmData.disable_gst ? '0' : (filmData.gst_on_platform_fee ? filmData.gst_on_platform_fee.toString() : ''),
       commission_fee_percentage: filmData.commission_fee_percentage ? filmData.commission_fee_percentage.toString() : '',
-      gst_on_commission_fee: filmData.gst_on_commission_fee ? filmData.gst_on_commission_fee.toString() : '',
+      gst_on_commission_fee: filmData.disable_gst ? '0' : (filmData.gst_on_commission_fee ? filmData.gst_on_commission_fee.toString() : ''),
       trailer_thumbnail: filmData.trailer_thumbnail ?? '',
       film_thumbnail_fullsize: filmData.film_thumbnail_fullsize ?? '',
       film_thumbnail_vertical: filmData.film_thumbnail_vertical ?? '',
@@ -1157,7 +1160,8 @@ const AdminPanel = () => {
   { id: 'sections', label: 'Homepage Sections', icon: Settings },
   { id: 'creators', label: 'Manage Creators', icon: Users },
   { id: 'submissions', label: 'Film Submissions', icon: Ticket },
-  { id: 'sales', label: 'Viewers & Sales', icon: BarChart3 }
+  { id: 'sales', label: 'Viewers & Sales', icon: BarChart3 },
+  { id: 'payouts', label: 'Creator Payouts', icon: DollarSign }
   ];
   // State for film submissions
   const [filmSubmissions, setFilmSubmissions] = useState([]);
@@ -2326,6 +2330,37 @@ const AdminPanel = () => {
                     <div className="flex-1 border-b border-gray-700 ml-2" />
                   </div>
                   
+                  {/* GST Toggle */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
+                    <div className="text-sm text-gray-400">
+                      <label htmlFor="disable_gst">GST Settings</label>
+                      <p className="text-xs text-gray-500 mt-1">Control GST calculations for this film</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Switch 
+                        id="disable_gst" 
+                        checked={filmForm.disable_gst} 
+                        onCheckedChange={checked => {
+                          if (checked) {
+                            // When GST is disabled, automatically set GST fields to 0
+                            setFilmForm(f => ({ 
+                              ...f, 
+                              disable_gst: checked,
+                              gst_on_platform_fee: '0',
+                              gst_on_commission_fee: '0'
+                            }));
+                          } else {
+                            // When GST is enabled, just update the toggle without changing other fields
+                            setFilmForm(f => ({ ...f, disable_gst: checked }));
+                          }
+                        }} 
+                      />
+                      <label htmlFor="disable_gst" className="text-sm text-gray-300">
+                        Disable GST for this film
+                      </label>
+                    </div>
+                  </div>
+                  
                   {/* Platform Fee */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
                     <div className="text-sm text-gray-400">
@@ -2351,30 +2386,32 @@ const AdminPanel = () => {
                     </div>
                   </div>
 
-                  {/* GST on Platform Fee */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
-                    <div className="text-sm text-gray-400">
-                      <label htmlFor="gst_on_platform_fee">GST on Platform Fee (%)</label>
-                      <p className="text-xs text-gray-500 mt-1">GST percentage applied on platform fee (0-100%)</p>
+                  {/* GST on Platform Fee - only show if GST is not disabled */}
+                  {!filmForm.disable_gst && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
+                      <div className="text-sm text-gray-400">
+                        <label htmlFor="gst_on_platform_fee">GST on Platform Fee (%)</label>
+                        <p className="text-xs text-gray-500 mt-1">GST percentage applied on platform fee (0-100%)</p>
+                      </div>
+                      <div>
+                        <Input 
+                          id="gst_on_platform_fee"
+                          placeholder="0.00" 
+                          type="text" 
+                          inputMode="decimal" 
+                          pattern="[0-9.]*" 
+                          value={filmForm.gst_on_platform_fee} 
+                          onChange={e => {
+                            const value = e.target.value.replace(/[^0-9.]/g, '');
+                            const numValue = parseFloat(value);
+                            if (value === '' || (!isNaN(numValue) && numValue >= 0 && numValue <= 100)) {
+                              setFilmForm(f => ({ ...f, gst_on_platform_fee: value }));
+                            }
+                          }} 
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <Input 
-                        id="gst_on_platform_fee"
-                        placeholder="0.00" 
-                        type="text" 
-                        inputMode="decimal" 
-                        pattern="[0-9.]*" 
-                        value={filmForm.gst_on_platform_fee} 
-                        onChange={e => {
-                          const value = e.target.value.replace(/[^0-9.]/g, '');
-                          const numValue = parseFloat(value);
-                          if (value === '' || (!isNaN(numValue) && numValue >= 0 && numValue <= 100)) {
-                            setFilmForm(f => ({ ...f, gst_on_platform_fee: value }));
-                          }
-                        }} 
-                      />
-                    </div>
-                  </div>
+                  )}
 
                   {/* Commission Fee */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
@@ -2401,30 +2438,32 @@ const AdminPanel = () => {
                     </div>
                   </div>
 
-                  {/* GST on Commission Fee */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
-                    <div className="text-sm text-gray-400">
-                      <label htmlFor="gst_on_commission_fee">GST on Commission Fee (%)</label>
-                      <p className="text-xs text-gray-500 mt-1">GST percentage applied on commission fee (0-100%)</p>
+                  {/* GST on Commission Fee - only show if GST is not disabled */}
+                  {!filmForm.disable_gst && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
+                      <div className="text-sm text-gray-400">
+                        <label htmlFor="gst_on_commission_fee">GST on Commission Fee (%)</label>
+                        <p className="text-xs text-gray-500 mt-1">GST percentage applied on commission fee (0-100%)</p>
+                      </div>
+                      <div>
+                        <Input 
+                          id="gst_on_commission_fee"
+                          placeholder="0.00" 
+                          type="text" 
+                          inputMode="decimal" 
+                          pattern="[0-9.]*" 
+                          value={filmForm.gst_on_commission_fee} 
+                          onChange={e => {
+                            const value = e.target.value.replace(/[^0-9.]/g, '');
+                            const numValue = parseFloat(value);
+                            if (value === '' || (!isNaN(numValue) && numValue >= 0 && numValue <= 100)) {
+                              setFilmForm(f => ({ ...f, gst_on_commission_fee: value }));
+                            }
+                          }} 
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <Input 
-                        id="gst_on_commission_fee"
-                        placeholder="0.00" 
-                        type="text" 
-                        inputMode="decimal" 
-                        pattern="[0-9.]*" 
-                        value={filmForm.gst_on_commission_fee} 
-                        onChange={e => {
-                          const value = e.target.value.replace(/[^0-9.]/g, '');
-                          const numValue = parseFloat(value);
-                          if (value === '' || (!isNaN(numValue) && numValue >= 0 && numValue <= 100)) {
-                            setFilmForm(f => ({ ...f, gst_on_commission_fee: value }));
-                          }
-                        }} 
-                      />
-                    </div>
-                  </div>
+                  )}
 
                   {/* Commission Slabs Configuration */}
                   <div className="space-y-4">
@@ -2783,6 +2822,30 @@ const AdminPanel = () => {
                     </div>
                   ))}
                 </div>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'payouts':
+        return (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold">Creator Payout Management</h2>
+              <div className="text-sm text-gray-400">
+                Review and process creator payout requests
+              </div>
+            </div>
+
+            {/* Payout Requests Table will be implemented here */}
+            <div className="glass-card p-6">
+              <div className="text-center py-12">
+                <DollarSign className="w-16 h-16 text-gray-500 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-400 mb-2">Payout Management</h3>
+                <p className="text-gray-500">
+                  This section will be implemented to manage creator payout requests.<br />
+                  Features: Review requests, approve/reject payouts, track payment status, and manage payment methods.
+                </p>
               </div>
             </div>
           </div>
