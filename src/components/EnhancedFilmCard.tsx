@@ -77,7 +77,6 @@ export const EnhancedFilmCard = ({
         .single();
       setInWatchlist(!!data && !error);
     })();
-    // eslint-disable-next-line
   }, [id]);
 
   // Add/remove from watchlist

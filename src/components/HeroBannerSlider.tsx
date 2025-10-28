@@ -8,6 +8,7 @@ import { LoginSignupModal } from "./LoginSignupModal";
 import { supabase } from "@/integrations/supabase/client";
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import Hls from 'hls.js';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
 import { useUserTickets } from '@/hooks/useUserTickets';
 
 interface HeroBanner {
@@ -44,7 +45,7 @@ export const HeroBannerSlider = ({ banners, showMobileOverlay }: HeroBannerSlide
   const [logoPath, setLogoPath] = useState('');
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authRedirect, setAuthRedirect] = useState<string | null>(null);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<SupabaseUser | null>(null);
   const [isVideoVisible, setIsVideoVisible] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -55,7 +56,7 @@ export const HeroBannerSlider = ({ banners, showMobileOverlay }: HeroBannerSlide
   const hasTicket = filmid && userTickets && userTickets[filmid];
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [loginRedirectPath, setLoginRedirectPath] = useState<string | null>(null);
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<SupabaseUser | null>(null);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setCurrentUser(data?.user || null));

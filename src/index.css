@@ -274,3 +274,54 @@ body{
 .youtube-player-container .ytp-chrome-top-buttons {
   display: none !important;
 }
+
+/* Modern Modal Animations */
+@keyframes zoom-in-95 {
+  0% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes error-bounce {
+  0%, 20%, 50%, 80%, 100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-8px);
+  }
+  60% {
+    transform: translateY(-4px);
+  }
+}
+
+.animate-in {
+  animation-fill-mode: both;
+}
+
+.zoom-in-95 {
+  animation-name: zoom-in-95;
+}
+
+.duration-200 {
+  animation-duration: 200ms;
+}
+
+.animate-error-bounce {
+  animation: error-bounce 0.6s ease-in-out;
+}
+
+/* Enhanced backdrop blur for better modal experience */
+.backdrop-blur-sm {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+/* Custom border width for loading spinner */
+.border-3 {
+  border-width: 3px;
+}

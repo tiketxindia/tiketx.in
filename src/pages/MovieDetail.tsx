@@ -29,6 +29,8 @@ const MovieDetail = () => {
   const [ticketExpiry, setTicketExpiry] = useState<string | null>(null);
   const [showCelebration, setShowCelebration] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
   const { refreshTickets } = useUserTickets();
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [feeBreakdown, setFeeBreakdown] = useState<FeeBreakdown | null>(null);
@@ -203,11 +205,148 @@ const MovieDetail = () => {
     while (!unique) {
       const randomNum = Math.floor(100000 + Math.random() * 900000); // 6 digits
       tiketId = `MYTIKET${randomNum}`;
-      const { data } = await supabase.from('film_tickets').select('id').eq('tiket_id', tiketId).single();
-      if (!data) unique = true;
+      const { data, error } = await supabase.from('film_tickets').select('id').eq('tiket_id', tiketId).maybeSingle();
+      if (!data || error) unique = true; // If no data found or error, the ID is unique
     }
     return tiketId;
   }
+
+  // Helper function to convert technical errors to customer-friendly messages
+  const getCustomerFriendlyError = (errorMessage: string): string => {
+    const lowerError = errorMessage.toLowerCase();
+    
+    if (lowerError.includes('cancelled by user') || lowerError.includes('payment cancelled')) {
+      return 'You cancelled the payment. No charges were made to your account.';
+    }
+    
+    if (lowerError.includes('verification failed') || lowerError.includes('invalid signature')) {
+      return 'We couldn\'t verify your payment. Please try again or contact support if the issue persists.';
+    }
+    
+    if (lowerError.includes('payment failed') || lowerError.includes('transaction failed')) {
+      return 'Your payment couldn\'t be processed. Please check your payment details and try again.';
+    }
+    
+    if (lowerError.includes('network') || lowerError.includes('connection')) {
+      return 'Network connection issue. Please check your internet connection and try again.';
+    }
+    
+    if (lowerError.includes('insufficient funds') || lowerError.includes('declined')) {
+      return 'Your payment was declined. Please check your account balance or try a different payment method.';
+    }
+    
+    if (lowerError.includes('expired') || lowerError.includes('timeout')) {
+      return 'Payment session expired. Please try again.';
+    }
+    
+    // For any other technical errors, provide a generic customer-friendly message
+    return 'We encountered an issue processing your payment. Please try again or contact our support team for assistance.';
+  };
+
+  // Handle payment flow - extracted for reuse
+  const handlePayment = async () => {
+    const user = (await supabase.auth.getUser()).data.user;
+    if (!user) {
+      setLoginModalOpen(true);
+      return;
+    }
+    
+    console.log('Current user for payment:', user.id);
+    
+    // Use total amount including fees for payment
+    const paymentAmount = feeBreakdown ? feeBreakdown.totalAmount : film.ticket_price;
+    openRazorpayModal({
+      amount: rupeesToPaise(paymentAmount),
+      name: film.title,
+      description: 'Movie Ticket',
+      receipt: `ticket_${film.id}_${Date.now()}`,
+      user_id: user.id,
+      film_id: film.id,
+      payment_type: 'ticket',
+      notes: {
+        film_id: film.id,
+        user_id: user.id,
+        ticket_price: film.ticket_price,
+        platform_fee: feeBreakdown?.platformFee || 0,
+        gst_on_platform_fee: feeBreakdown?.gstOnPlatformFee || 0,
+        total_amount: paymentAmount
+      },
+      onVerificationStart: () => {
+        setIsVerifyingPayment(true);
+      },
+      onSuccess: async (response) => {
+        // Payment verified successfully on server
+        console.log('Payment verified:', response);
+        setIsVerifyingPayment(false);
+        
+        // Get the razorpay_orders record to link with the ticket
+        const { data: razorpayOrder, error: razorpayError } = await supabase
+          .from('razorpay_orders')
+          .select('id')
+          .eq('razorpay_order_id', response.razorpay_order_id)
+          .single();
+        
+        if (razorpayError || !razorpayOrder) {
+          console.error('Failed to find razorpay order:', razorpayError);
+          setPaymentError('Your payment was processed, but we couldn\'t complete your ticket purchase. Please contact our support team for assistance.');
+          return;
+        }
+        
+        // On payment success, deactivate previous tickets and insert new one
+        const purchaseDate = new Date();
+        // Use film's custom ticket_expiry_hours or default to 24 hours
+        const expiryHours = film.ticket_expiry_hours || 24;
+        const expiryDate = new Date(purchaseDate.getTime() + expiryHours * 60 * 60 * 1000);
+        const tiketId = await generateUniqueTiketId();
+        
+        // 1. Set is_active=false for all previous tickets for this user and film
+        await supabase.from('film_tickets')
+          .update({ is_active: false })
+          .eq('user_id', user.id)
+          .eq('film_id', film.id)
+          .eq('is_active', true);
+        
+        // 2. Insert new ticket with is_active=true and fee breakdown
+        const ticketData: any = {
+          user_id: user.id,
+          film_id: film.id,
+          purchase_date: purchaseDate.toISOString(),
+          expiry_date: expiryDate.toISOString(),
+          price: film.ticket_price, // Keep for backward compatibility
+          is_active: true,
+          tiket_id: tiketId,
+          razorpay_order_id: razorpayOrder.id, // Link to razorpay_orders table
+        };
+
+        // Add fee breakdown if available
+        if (feeBreakdown) {
+          ticketData.platform_fee = feeBreakdown.platformFee;
+          ticketData.gst_on_platform_fee = feeBreakdown.gstOnPlatformFee;
+          ticketData.total_amount_paid = feeBreakdown.totalAmount;
+        } else {
+          ticketData.platform_fee = 0;
+          ticketData.gst_on_platform_fee = 0;
+          ticketData.total_amount_paid = film.ticket_price;
+        }
+
+        const { error } = await supabase.from('film_tickets').insert(ticketData);
+        if (error) {
+          setPaymentError('We encountered an issue while generating your ticket. Don\'t worry, your payment is secure. Please contact support for immediate assistance.');
+        } else {
+          setHasTicket(true);
+          setTicketExpiry(expiryDate.toISOString());
+          setShowCelebration(true);
+          setShowConfetti(true);
+          setTimeout(() => setShowConfetti(false), 60000);
+          refreshTickets();
+        }
+      },
+      onFailure: (reason) => {
+        setIsVerifyingPayment(false);
+        setPaymentError(getCustomerFriendlyError(reason));
+      },
+    });
+  };
 
   return (
     <TooltipProvider>
@@ -499,72 +638,7 @@ const MovieDetail = () => {
               </div>
               <button
                 className="gradient-button text-base px-6 py-3 font-bold rounded-2xl mx-4"
-                onClick={async () => {
-                  // Open Razorpay modal for ticket purchase
-                  const user = (await supabase.auth.getUser()).data.user;
-                  if (!user) {
-                    setLoginModalOpen(true);
-                    return;
-                  }
-                  // Use total amount including fees for payment
-                  const paymentAmount = feeBreakdown ? feeBreakdown.totalAmount : film.ticket_price;
-                  openRazorpayModal({
-                    amount: rupeesToPaise(paymentAmount),
-                    name: film.title,
-                    description: 'Movie Ticket',
-                    order_id: undefined, // Optionally pass order_id from backend
-                    onSuccess: async (response) => {
-                      // On payment success, deactivate previous tickets and insert new one
-                      const purchaseDate = new Date();
-                      // Use film's custom ticket_expiry_hours or default to 24 hours
-                      const expiryHours = film.ticket_expiry_hours || 24;
-                      const expiryDate = new Date(purchaseDate.getTime() + expiryHours * 60 * 60 * 1000);
-                      const tiketId = await generateUniqueTiketId();
-                      // 1. Set is_active=false for all previous tickets for this user and film
-                      await supabase.from('film_tickets')
-                        .update({ is_active: false })
-                        .eq('user_id', user.id)
-                        .eq('film_id', film.id)
-                        .eq('is_active', true);
-                      // 2. Insert new ticket with is_active=true and fee breakdown
-                      const ticketData: any = {
-                        user_id: user.id,
-                        film_id: film.id,
-                        purchase_date: purchaseDate.toISOString(),
-                        expiry_date: expiryDate.toISOString(),
-                        price: film.ticket_price, // Keep for backward compatibility
-                        is_active: true,
-                        tiket_id: tiketId,
-                      };
-
-                      // Add fee breakdown if available
-                      if (feeBreakdown) {
-                        ticketData.platform_fee = feeBreakdown.platformFee;
-                        ticketData.gst_on_platform_fee = feeBreakdown.gstOnPlatformFee;
-                        ticketData.total_amount_paid = feeBreakdown.totalAmount;
-                      } else {
-                        ticketData.platform_fee = 0;
-                        ticketData.gst_on_platform_fee = 0;
-                        ticketData.total_amount_paid = film.ticket_price;
-                      }
-
-                      const { error } = await supabase.from('film_tickets').insert(ticketData);
-                      if (error) {
-                        alert('Failed to save ticket: ' + error.message);
-                      } else {
-                        setHasTicket(true);
-                        setTicketExpiry(expiryDate.toISOString());
-                        setShowCelebration(true);
-                        setShowConfetti(true);
-                        setTimeout(() => setShowConfetti(false), 60000);
-                        refreshTickets();
-                      }
-                    },
-                    onFailure: (reason) => {
-                      alert('Payment failed or cancelled: ' + reason);
-                    },
-                  });
-                }}
+                onClick={handlePayment}
                 disabled={!film.ticket_price || hasTicket}
               >
                 Buy Tiket
@@ -695,6 +769,85 @@ const MovieDetail = () => {
           </div>
         </div>
       )}
+      
+      {/* Payment Error Modal */}
+      {paymentError && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl border-0 animate-in zoom-in-95 duration-200">
+            {/* Error Icon */}
+            <div className="flex justify-center mb-6">
+              <div className="relative animate-error-bounce">
+                <div className="w-16 h-16 bg-gradient-to-br from-red-50 to-red-100 rounded-full flex items-center justify-center">
+                  <svg className="w-8 h-8 text-red-500" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                  </svg>
+                </div>
+                {/* Animated ring */}
+                <div className="absolute inset-0 w-16 h-16 border-2 border-red-200 rounded-full animate-ping"></div>
+              </div>
+            </div>
+            
+            {/* Content */}
+            <div className="text-center space-y-4">
+              <h3 className="text-xl font-bold text-gray-900 tracking-tight">Payment Failed</h3>
+              <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                <p className="text-sm text-gray-600 leading-relaxed">{paymentError}</p>
+              </div>
+            </div>
+            
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-3 mt-8">
+              <button
+                onClick={() => setPaymentError(null)}
+                className="flex-1 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-semibold px-6 py-3 rounded-xl transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] shadow-lg hover:shadow-xl"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  setPaymentError(null);
+                  handlePayment();
+                }}
+                className="flex-1 bg-white hover:bg-gray-50 text-gray-700 font-semibold px-6 py-3 rounded-xl border-2 border-gray-200 hover:border-gray-300 transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98]"
+              >
+                Try Again
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Payment Verification Loading Modal */}
+      {isVerifyingPayment && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-8 max-w-sm w-full mx-4 shadow-2xl border-0 animate-in zoom-in-95 duration-200">
+            {/* Loading Animation */}
+            <div className="flex justify-center mb-6">
+              <div className="relative">
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-50 to-indigo-100 rounded-full flex items-center justify-center">
+                  <div className="w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+                {/* Animated ring */}
+                <div className="absolute inset-0 w-16 h-16 border-2 border-blue-200 rounded-full animate-pulse"></div>
+              </div>
+            </div>
+            
+            {/* Content */}
+            <div className="text-center space-y-3">
+              <h3 className="text-xl font-bold text-gray-900 tracking-tight">Verifying Payment</h3>
+              <p className="text-sm text-gray-600 leading-relaxed">Please wait while we confirm your payment securely.</p>
+              
+              {/* Progress dots */}
+              <div className="flex justify-center space-x-1 pt-2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <LoginSignupModal open={loginModalOpen} onOpenChange={setLoginModalOpen} />
     </div>
     </TooltipProvider>

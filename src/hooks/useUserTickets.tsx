@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 interface Ticket {
   film_id: string;
   expiry_date: string;
+  razorpay_order_id?: string;
 }
 
 interface UserTicketsContextType {

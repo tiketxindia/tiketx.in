@@ -526,17 +526,35 @@ function CreatorDashboard() {
   }
   async function handleSubmitOnboarding() {
     if (!activeSubmissionId) return;
+    
+    // Get current user
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) {
+      toast({ title: 'Authentication required', variant: 'destructive' });
+      return;
+    }
+    
     // Fetch onboarding fee (default Rs. 2000)
     const onboardingFee = 2000;
-    // Create Razorpay order (simulate, or call backend if needed)
-    // For demo, just use amount in paise
+    // Create secure Razorpay order with server-side verification
     openRazorpayModal({
       amount: onboardingFee * 100,
       name: "TiketX Onboarding Fee",
       description: "Onboarding fee for film submission",
-      order_id: undefined,
+      receipt: `onboarding_${activeSubmissionId}_${Date.now()}`,
+      user_id: userData.user.id,
+      submission_id: activeSubmissionId,
+      payment_type: 'onboarding',
+      notes: {
+        submission_id: activeSubmissionId,
+        fee_type: 'onboarding',
+        onboarding_fee: onboardingFee
+      },
       onSuccess: async (payment) => {
-        // Save onboarding info only after payment
+        // Payment verified successfully on server
+        console.log('Onboarding payment verified:', payment);
+        
+        // Save onboarding info only after payment verification
         const { error } = await supabase
           .from('film_submissions')
           .update({
